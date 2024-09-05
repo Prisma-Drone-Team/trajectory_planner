@@ -92,7 +92,7 @@ void OffboardControl::key_input() {
 	double duration;
 	float  yaw;
 	while(!exit && rclcpp::ok()) {
-		std::cout << "Enter command [arm | go | takeoff | stop]: \n"; 
+		std::cout << "Enter command [arm | go | takeoff | land | stop]: \n"; 
 		std::cin >> cmd;
 		if(cmd == "go") {
 			std::cout << "Enter X coordinate: "; 
@@ -106,7 +106,7 @@ void OffboardControl::key_input() {
 			yaw = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0));
 			std::cout << "Enter duration: "; 
 			std::cin >> duration;
-			startTraj(_prev_sp, yaw, 10);
+			startTraj(_prev_sp, yaw, 10); // considered 10 seconds to modify the yaw before to follow the desired linear trajectiory
 			startTraj(sp, yaw, duration);
 			_prev_sp = sp;
 
@@ -129,6 +129,13 @@ void OffboardControl::key_input() {
 			std::cin >> alt;
 			this->arm();
 			takeoffTraj(alt);
+			_prev_sp(2) = alt;
+		}
+		else if(cmd == "land") {
+			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.";
+			_prev_sp(2) = 0.0; 
+			startTraj(_prev_sp, yaw, 15);
+			
 		}
 		else if(cmd == "stop") {
 			exit = true;
