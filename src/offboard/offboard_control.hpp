@@ -73,6 +73,9 @@
 #include "Trajectory.hpp"
 #include "planner_spline.h"
 
+//3d path planner --> (https://github.com/jocacace/pplanner)
+#include "planner/planner.h" 
+
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace px4_msgs::msg;
@@ -164,5 +167,11 @@ private:
 	geometry_msgs::msg::PoseStamped _x;
 	geometry_msgs::msg::TwistStamped _xd;
 	geometry_msgs::msg::AccelStamped _xdd;
+
+	PATH_PLANNER *_pp;
+	double _xbounds[2];
+	double _ybounds[2];
+	double _zbounds[2];
+	double _robot_radius;
 
 };
