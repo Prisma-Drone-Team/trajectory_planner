@@ -9,7 +9,7 @@ Launch PX4 gazebo simulation and run DDS agent in two different terminal
 
 In a third terminal run the trajectory planner node
 
-       $ ros2 run 4D_trajectory_planning offboard_control 
+       $ ros2 run trajectory_planner offboard_control 
 
 ## Features
 
