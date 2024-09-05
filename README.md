@@ -13,7 +13,12 @@ In a third terminal run the trajectory planner node
 
 ## Features
 
+Arming routine
+
 Takeoff routine 
+
+Point-to-point trajectory planning
 
 The desired yaw is computed to have the drone navigating toward the approaching direction
 
+Landing routine
