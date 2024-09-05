@@ -57,6 +57,20 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_timer = this->create_wall_timer(_timer_period, std::bind(&OffboardControl::timer_callback, this));
 
 	boost::thread key_input_t( &OffboardControl::key_input, this );
+
+	//---Init planner
+	_xbounds[0] = -5.0;
+	_xbounds[1] = 21.0;
+	_ybounds[0] = -5.0;
+	_ybounds[1] = 11.0;
+	_zbounds[0] = -1.0;
+	_zbounds[1] = 5.0;
+	_robot_radius = 0.4;
+
+    _pp = new PATH_PLANNER();
+    _pp->init( _xbounds, _ybounds, _zbounds);
+    _pp->set_robot_geometry(_robot_radius);
+    //---
 }
 
 void OffboardControl::timer_callback() {
@@ -132,7 +146,7 @@ void OffboardControl::key_input() {
 			_prev_sp(2) = alt;
 		}
 		else if(cmd == "land") {
-			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.";
+			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
 			_prev_sp(2) = 0.0; 
 			startTraj(_prev_sp, yaw, 15);
 			

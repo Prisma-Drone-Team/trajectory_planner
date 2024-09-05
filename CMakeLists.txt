@@ -22,7 +22,12 @@ find_package(Boost REQUIRED COMPONENTS
 )
 find_package(tf2 REQUIRED)
 
-include_directories(include)
+find_package(ompl REQUIRED)
+find_package(fcl REQUIRED)
+include_directories(include 
+  /opt/ros/humble/include/ompl-1.6
+  #/usr/include/3dPathPlanner
+)
 
 # Add frame_transforms lib
 add_library(frame_transforms SHARED src/lib/frame_transforms.cpp)
@@ -32,16 +37,23 @@ target_include_directories(frame_transforms PUBLIC
 	$<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 
+# add_library(3dPathPlanner SHARED src/lib/planner.cpp)
+# ament_target_dependencies(3dPathPlanner ompl fcl Eigen3)
+# target_include_directories(3dPathPlanner PUBLIC
+# 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
+# 	$<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+# )
+
 
 # /offboard_control
-add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/planner_spline.cpp)
-ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2)
+add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/planner_spline.cpp src/offboard/planner/planner.cpp)
+ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl )
 target_include_directories(offboard_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   ${Eigen3_INCLUDE_DIRS}
 )
-target_link_libraries(offboard_control Eigen3::Eigen ${geometry_msgs_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(offboard_control Eigen3::Eigen ${geometry_msgs_LIBRARIES} ${Boost_LIBRARIES} ${OMPL_LIBRARIES} fcl) # ${ompl_LIBRARIES} fcl)
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
@@ -50,23 +62,35 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 ############
 
 # Export information to downstream packages
-ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs)
+ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs fcl ompl)
 
 ament_export_targets(export_frame_transforms HAS_LIBRARY_TARGET)
 
 ament_export_include_directories(include)
 ament_export_libraries(frame_transforms)
 
+
+# ament_export_targets(export_3dPathPlanner HAS_LIBRARY_TARGET)
+# ament_export_libraries(3dPathPlanner)
+
 # Install header files
 install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
 
 install(TARGETS frame_transforms
-	EXPORT export_frame_transforms
+	EXPORT export_frame_transforms 
 	ARCHIVE DESTINATION lib
 	LIBRARY DESTINATION lib
 	RUNTIME DESTINATION bin
 	INCLUDES DESTINATION include
 )
+
+# install(TARGETS 3dPathPlanner
+# 	EXPORT export_3dPathPlanner 
+# 	ARCHIVE DESTINATION lib
+# 	LIBRARY DESTINATION lib
+# 	RUNTIME DESTINATION bin
+# 	INCLUDES DESTINATION include
+# )
 
 # Install launch files.
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
