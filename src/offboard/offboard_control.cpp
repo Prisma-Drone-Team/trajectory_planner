@@ -22,6 +22,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 		if(_traj_points.size() % 5 != 0)
 			_traj_present = false;
 	}
+	
+
 
 	rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
@@ -66,6 +68,12 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_zbounds[0] = -1.0;
 	_zbounds[1] = 5.0;
 	_robot_radius = 0.4;
+	
+	// TODO: add paramters
+	// double robot_radius;
+	// this->declare_parameter("robot_radius",0.1);
+	// robot_radius = this->get_parameter("robot_radius").as_double();
+	// RCLCPP_INFO(get_logger(), "robot_radius: %f", robot_radius);
 
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
@@ -117,7 +125,7 @@ void OffboardControl::key_input() {
 			std::cin >> sp(2);
 			// std::cout << "Enter yaw: "; 
 			// std::cin >> yaw;
-			yaw = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0));
+			yaw = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 			std::cout << "Enter duration: "; 
 			std::cin >> duration;
 			startTraj(_prev_sp, yaw, 10); // considered 10 seconds to modify the yaw before to follow the desired linear trajectiory
@@ -219,36 +227,7 @@ void OffboardControl::publish_trajectory_setpoint() {
 	msg.yaw = matrix::Eulerf(des_att).psi();
 	msg.yawspeed = 0.0f;
 
-	// TiltingAttitudeSetpoint att_sp{};
-	// att_sp.timestamp = msg.timestamp;
-
-	// att_sp.q_d[0] = des_att(0);
-	// att_sp.q_d[1] = des_att(1);
-	// att_sp.q_d[2] = des_att(2);
-	// att_sp.q_d[3] = des_att(3);
-	
-	// std::cout << att_sp.q_d[0] << ", ";
-	// std::cout << att_sp.q_d[1] << ", ";
-	// std::cout << att_sp.q_d[2] << ", ";
-	// std::cout << att_sp.q_d[3] << "\n";
-
-	// _tilting_attitude_setpoint_publisher->publish(att_sp);
-
-
-	// msg.x = _current_position_setpoint(0);
-	// msg.y = _current_position_setpoint(1);
-	// msg.z = _current_position_setpoint(2);
-	// msg.vx = _current_velocity_setpoint(0);
-	// msg.vy = _current_velocity_setpoint(1);
-	// msg.vz = _current_velocity_setpoint(2);
-	// msg.acceleration[0] = _current_acceleration_setpoint(0);
-	// msg.acceleration[1] = _current_acceleration_setpoint(1);
-	// msg.acceleration[2] = _current_acceleration_setpoint(2);
-	// msg.yaw = _current_yaw_setpoint; // [-PI:PI]
-	// msg.yawspeed = 0.0f;
-
 	_trajectory_setpoint_publisher->publish(msg);
-	// std::cout << "Sending setpoint\n";
 }
 
 

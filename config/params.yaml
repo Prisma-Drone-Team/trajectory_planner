@@ -2,3 +2,4 @@ offboard_control:
   ros__parameters:
     traj_points: [0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 10.0,
                   10.0, 0.0, -2.0, 0.0, 0.0, 0.0, 10.0]
+    robot_radius: 0.5
