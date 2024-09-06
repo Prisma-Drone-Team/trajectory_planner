@@ -57,6 +57,10 @@ target_link_libraries(offboard_control Eigen3::Eigen ${geometry_msgs_LIBRARIES} 
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
+add_executable(move_manager_node src/move_manager_node.cpp)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs)
+install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
+
 ############
 # Install ##
 ############
