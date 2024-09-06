@@ -198,6 +198,7 @@ void OffboardControl::key_input() {
 			std::cout << "Enter altitude: "; 
 			std::cin >> alt;
 			this->arm();
+			alt = alt > 0 ? -alt : alt;
 			takeoffTraj(alt);
 			_prev_sp(2) = alt;
 		}
@@ -212,11 +213,13 @@ void OffboardControl::key_input() {
 			rclcpp::shutdown();
 		}
 		else if(cmd == "arm") {
+			_first_traj = false;
 			this->flight_termination(0);
 			this->arm();
 		}
 		else if(cmd == "term") {
 			this->flight_termination(1);
+			
 		}
 		else {
 			std::cout << "Unknown command;\n";
@@ -364,7 +367,7 @@ void OffboardControl::takeoffTraj(float alt) {
 	poses.push_back(p);
 	times.push_back(t);
 	
-	alt = alt > 0 ? -alt : alt;
+	
 	p.pose.position.z = alt; 
 	poses.push_back(p);
 	times.push_back(3.0f * abs(alt));
@@ -388,7 +391,7 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	double t;
 
 	// if(pos(2) > 0.0f)
-	// 	pos(2) *= -1;
+	//     pos(2) *= -1;
 
 	matrix::Quaternionf att(matrix::Eulerf(0, 0, yaw));
 
@@ -478,7 +481,7 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
     _pp->set_goal_state(g);
 
 
-    std::vector<POSE> poses;
+    std::vector<POSE> nav_poses;
     std::vector<POSE> opt_poses;
 
 
@@ -507,16 +510,16 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
     ybounds[1] = _y_valid_max;
     zbounds[1] = bz_max + _z_motion_threshold; 
 
-    int ret = _pp->plan(2, xbounds, ybounds, zbounds, poses, opt_poses);
+    int ret = _pp->plan(2, xbounds, ybounds, zbounds, nav_poses, opt_poses);
 
-	if( ret < 0 || poses.size() < 2 ) 
+	if( ret < 0 || nav_poses.size() < 2 ) 
             std::cout << "Planner not correctly initialized" << std::endl;
 	else {
 
 		std::cout << "Solution: " << std::endl;
 		
-		for(int i=0; i<poses.size(); i++ ) {
-			std::cout << "Pose: [" << i << "]: " << "(" << poses[i].position.x << " " << poses[i].position.y << " " << poses[i].position.z << ")" << std::endl;
+		for(int i=0; i<nav_poses.size(); i++ ) {
+			std::cout << "Pose: [" << i << "]: " << "(" << nav_poses[i].position.x << " " << nav_poses[i].position.y << " " << nav_poses[i].position.z << ")" << std::endl;
 		}
 	}
 }
