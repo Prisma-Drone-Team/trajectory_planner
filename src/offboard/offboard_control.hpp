@@ -123,7 +123,7 @@ private:
 	void takeoffTraj(float alt);
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
-	void plan(Eigen::Vector3d wp);
+	void plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
