@@ -92,6 +92,26 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_zbounds[1] = this->get_parameter("z_upper_bound").as_double();
 	RCLCPP_INFO(get_logger(), "z_upper_bound: %f", _ybounds[1] );
 
+	this->declare_parameter("x_valid_min",-10.0);
+	_x_valid_min = this->get_parameter("x_valid_min").as_double();
+	RCLCPP_INFO(get_logger(), "x_valid_min: %f", _x_valid_min);
+
+	this->declare_parameter("y_valid_min",-10.0);
+	_y_valid_min = this->get_parameter("y_valid_min").as_double();
+	RCLCPP_INFO(get_logger(), "y_valid_min: %f", _y_valid_min);
+
+	this->declare_parameter("x_valid_max",10.0);
+	_x_valid_max = this->get_parameter("x_valid_max").as_double();
+	RCLCPP_INFO(get_logger(), "x_valid_max: %f", _x_valid_max);
+
+	this->declare_parameter("y_valid_max",10.0);
+	_y_valid_max = this->get_parameter("y_valid_max").as_double();
+	RCLCPP_INFO(get_logger(), "y_valid_max: %f", _y_valid_max);
+
+	this->declare_parameter("z_motion_threshold",1.0);
+	_z_motion_threshold = this->get_parameter("z_motion_threshold").as_double();
+	RCLCPP_INFO(get_logger(), "z_motion_threshold: %f", _z_motion_threshold);
+
 
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
@@ -132,7 +152,7 @@ void OffboardControl::key_input() {
 	double duration;
 	float  yaw;
 	while(!exit && rclcpp::ok()) {
-		std::cout << "Enter command [arm | go | takeoff | land | stop]: \n"; 
+		std::cout << "Enter command [arm | go | takeoff | land | stop | nav]: \n"; 
 		std::cin >> cmd;
 		if(cmd == "go") {
 			std::cout << "Enter X coordinate: "; 
@@ -150,6 +170,16 @@ void OffboardControl::key_input() {
 			startTraj(sp, yaw, duration);
 			_prev_sp = sp;
 
+		}
+		else if(cmd=="nav"){
+			Eigen::Vector3d wp;
+			std::cout << "Enter X coordinate: "; 
+			std::cin >> wp[0];
+			std::cout << "Enter Y coordinate: "; 
+			std::cin >> wp[1];
+			std::cout << "Enter Z coordinate: "; 
+			std::cin >> wp[2];
+			plan(wp);
 		}
 		// else if(cmd == "traj") {
 		// 	if(!_traj_present) {
@@ -393,6 +423,95 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 
 	// auto end = steady_clock::now();
 }
+
+
+void OffboardControl::plan(Eigen::Vector3d wp) {
+
+    // if( _use_octomap ) {
+    //     while(!_map_set) usleep(0.1*1e6);
+    // }
+
+    POSE s;
+    POSE g;
+    
+    s.position.x = _last_pos_sp(0); 
+    s.position.y = _last_pos_sp(1);
+    s.position.z = _last_pos_sp(2);
+    s.orientation.w = 1.0;
+    s.orientation.x = 0.0;
+    s.orientation.y = 0.0;
+    s.orientation.z = 0.0;
+
+    g.position.x = wp[0];
+    g.position.y = wp[1];
+    g.position.z = wp[2];
+    g.orientation.w = 1.0;
+    g.orientation.x = 0.0;
+    g.orientation.y = 0.0;
+    g.orientation.z = 0.0;
+
+
+    // geometry_msgs::PoseStamped p;
+    // p.header.frame_id = "drone/map";
+
+    // Eigen::Vector3d lp;
+    // Eigen::Vector3d gp;
+
+    // nav_msgs::Path generated_path_opt;
+    // generated_path_opt.header.frame_id = "drone/map";
+
+
+    // nav_msgs::Path generated_path;
+    // generated_path.header.frame_id = "drone/map";
+
+    _pp->set_start_state(s);
+    _pp->set_goal_state(g);
+
+
+    std::vector<POSE> poses;
+    std::vector<POSE> opt_poses;
+
+
+    double xbounds[2];
+    double ybounds[2];
+    double zbounds[2];
+    // double bz_min = 0.0; //( _w_p[2] < wp[2] ) ?   
+    // double bz_max = 0.0; 
+
+    // if (  _w_p[2] < wp[2]  ) {
+    //     bz_min = _w_p[2];
+    //     bz_max = wp[2];
+    // }
+    // else {
+    //     bz_min = wp[2];
+    //     bz_max = _w_p[2];
+    // }
+
+
+    xbounds[0] = _x_valid_min;
+    ybounds[0] = _y_valid_min;
+    //zbounds[0] = bz_min - _z_motion_threshold; //param?
+	zbounds[0] = -_z_motion_threshold;
+
+    xbounds[1] = _x_valid_max;
+    ybounds[1] = _y_valid_max;
+    //zbounds[1] = bz_max + _z_motion_threshold; 
+    zbounds[1] = _z_motion_threshold;
+
+    int ret = _pp->plan(2, xbounds, ybounds, zbounds, poses, opt_poses);
+
+	if( ret < 0 || poses.size() < 2 ) 
+            std::cout << "Planner not correctly initialized" << std::endl;
+	else {
+
+		std::cout << "Solution: " << std::endl;
+		
+		for(int i=0; i<poses.size(); i++ ) {
+			std::cout << "Pose: [" << i << "]: " << "(" << poses[i].position.x << " " << poses[i].position.y << " " << poses[i].position.z << ")" << std::endl;
+		}
+	}
+}
+
 
 int main(int argc, char* argv[]) {
 	std::cout << "Starting offboard control node..." << std::endl;
