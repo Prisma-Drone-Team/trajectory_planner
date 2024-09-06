@@ -28,3 +28,6 @@ offboard_control:
     rviz_output: true
     id_to_follow: 16
     marker_timeout: 0.1
+
+    max_yaw_rate: 0.5
+    max_velocity: 0.5
