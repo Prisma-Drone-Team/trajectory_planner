@@ -50,6 +50,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				}
 				if(!_first_traj){
 					_prev_sp = _position;
+					_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
 				}
 			});
 
@@ -61,6 +62,12 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	boost::thread key_input_t( &OffboardControl::key_input, this );
 
 	//---Init planner
+	this->declare_parameter("max_yaw_rate", .5);
+	_max_yaw_rate = this->get_parameter("max_yaw_rate").as_double();
+	RCLCPP_INFO(get_logger(), "max_yaw_rate: %f", _max_yaw_rate);
+	this->declare_parameter("max_velocity", .5);
+	_max_velocity = this->get_parameter("max_velocity").as_double();
+	RCLCPP_INFO(get_logger(), "max_velocity: %f", _max_velocity);
 
 	
 	this->declare_parameter("robot_radius",0.1);
@@ -112,7 +119,6 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_z_motion_threshold = this->get_parameter("z_motion_threshold").as_double();
 	RCLCPP_INFO(get_logger(), "z_motion_threshold: %f", _z_motion_threshold);
 
-
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
@@ -150,7 +156,7 @@ void OffboardControl::key_input() {
 	std::string cmd;
 	matrix::Vector3f sp;
 	double duration;
-	float  yaw;
+	float  yaw_d;
 	while(!exit && rclcpp::ok()) {
 		std::cout << "Enter command [arm | go | takeoff | land | stop | nav | term]: \n"; 
 		std::cin >> cmd;
@@ -163,12 +169,18 @@ void OffboardControl::key_input() {
 			std::cin >> sp(2);
 			// std::cout << "Enter yaw: "; 
 			// std::cin >> yaw;
-			yaw = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-			std::cout << "Enter duration: "; 
-			std::cin >> duration;
-			startTraj(_prev_sp, yaw, 10); // considered 10 seconds to modify the yaw before to follow the desired linear trajectiory
-			startTraj(sp, yaw, duration);
+			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+			// std::cout << "Enter duration: "; 
+			// std::cin >> duration;
+
+			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+			startTraj(_prev_sp, yaw_d, yaw_time); // considered 10 seconds to modify the yaw before to follow the desired linear trajectiory
+			startTraj(sp, yaw_d, duration);
+
 			_prev_sp = sp;
+			_prev_yaw_sp = yaw_d;
 
 		}
 		else if(cmd=="nav"){
@@ -199,14 +211,13 @@ void OffboardControl::key_input() {
 			std::cin >> alt;
 			this->arm();
 			alt = alt > 0 ? -alt : alt;
-			takeoffTraj(alt);
-			_prev_sp(2) = alt;
+			takeoffTraj(alt);                   // TODO check time logic 
+			_prev_sp(2) = alt;                    
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
 			_prev_sp(2) = 0.5; 
-			startTraj(_prev_sp, yaw, 15);
-			
+			startTraj(_prev_sp, yaw_d, 15);	 // TODO tune time
 		}
 		else if(cmd == "stop") {
 			exit = true;
@@ -218,8 +229,7 @@ void OffboardControl::key_input() {
 			this->arm();
 		}
 		else if(cmd == "term") {
-			this->flight_termination(1);
-			
+			this->flight_termination(1);		 // TODO unire term a land (check odometry feedback)
 		}
 		else {
 			std::cout << "Unknown command;\n";

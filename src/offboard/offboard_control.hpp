@@ -168,6 +168,7 @@ private:
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
 	matrix::Vector3f _prev_sp;
+	float _prev_yaw_sp;
 
 	geometry_msgs::msg::PoseStamped _x;
 	geometry_msgs::msg::TwistStamped _xd;
@@ -178,5 +179,7 @@ private:
 	double _ybounds[2];
 	double _zbounds[2];
 	double _robot_radius, _x_valid_min, _x_valid_max, _y_valid_min, _y_valid_max, _z_motion_threshold;
+
+	double _max_yaw_rate, _max_velocity;
 
 };
