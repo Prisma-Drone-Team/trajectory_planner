@@ -17,7 +17,7 @@ def generate_launch_description():
         'params.yaml'
         )
 
-    # Define the mocap_px4_bridge node
+    # Define the offboard node
     offboard_node = Node(
         package='trajectory_planner',
         executable='offboard_node',
