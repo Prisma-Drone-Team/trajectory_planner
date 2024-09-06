@@ -9,8 +9,6 @@
 	3. add a way to control also yaw (no fixed heading)
 	5. octomap integration (subscription etc.)
 
-
-
 */
 // END - TODO -----------------------------------------------------------------------------------
 
