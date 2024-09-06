@@ -120,6 +120,8 @@ private:
 	void takeoffTraj(float alt);
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
+	void plan(Eigen::Vector3d wp);
+
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
@@ -172,6 +174,6 @@ private:
 	double _xbounds[2];
 	double _ybounds[2];
 	double _zbounds[2];
-	double _robot_radius;
+	double _robot_radius, _x_valid_min, _x_valid_max, _y_valid_min, _y_valid_max, _z_motion_threshold;
 
 };
