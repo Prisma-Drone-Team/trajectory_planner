@@ -2,6 +2,18 @@
 
 #include <cmath>
 
+// TODO -----------------------------------------------------------------------------------------
+/*
+	1. checker thread ( IDEA: add  _plan_is_valid flag to evluate)
+	2. manager node (publish a string with "nav" command "land" etc. )
+	3. add a way to control also yaw (no fixed heading)
+	5. octomap integration (subscription etc.)
+
+
+
+*/
+// END - TODO -----------------------------------------------------------------------------------
+
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
 	_offboard_control_mode_publisher =
@@ -176,7 +188,7 @@ void OffboardControl::key_input() {
 			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
 
-			startTraj(_prev_sp, yaw_d, yaw_time); // considered 10 seconds to modify the yaw before to follow the desired linear trajectiory
+			startTraj(_prev_sp, yaw_d, yaw_time); 
 			startTraj(sp, yaw_d, duration);
 
 			_prev_sp = sp;
@@ -191,7 +203,24 @@ void OffboardControl::key_input() {
 			std::cin >> wp[1];
 			std::cout << "Enter Z coordinate: "; 
 			std::cin >> wp[2];
-			plan(wp);
+
+			//std::vector<POSE>* opt_poses;
+			auto opt_poses = std::make_shared<std::vector<POSE>>();
+			plan(wp,opt_poses);
+
+			for(int i = 0; i<int(opt_poses->size()); i++) {
+				matrix::Vector3f sp((*opt_poses)[i].position.x, (*opt_poses)[i].position.y, -(*opt_poses)[i].position.z);    // TODO proper conversion
+				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+				double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+				double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+				startTraj(_prev_sp, yaw_d, yaw_time); 
+				startTraj(sp, yaw_d, duration);
+
+				_prev_sp = sp;
+				_prev_yaw_sp = yaw_d;
+			}
+
 		}
 		// else if(cmd == "traj") {
 		// 	if(!_traj_present) {
@@ -448,7 +477,7 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 }
 
 
-void OffboardControl::plan(Eigen::Vector3d wp) {
+void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
 
     // if( _use_octomap ) {
     //     while(!_map_set) usleep(0.1*1e6);
@@ -492,7 +521,7 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
 
 
     std::vector<POSE> nav_poses;
-    std::vector<POSE> opt_poses;
+    //std::vector<POSE> opt_poses;
 
 
     double xbounds[2];
@@ -520,7 +549,7 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
     ybounds[1] = _y_valid_max;
     zbounds[1] = bz_max + _z_motion_threshold; 
 
-    int ret = _pp->plan(2, xbounds, ybounds, zbounds, nav_poses, opt_poses);
+    int ret = _pp->plan(2, xbounds, ybounds, zbounds, nav_poses, *opt_poses);
 
 	if( ret < 0 || nav_poses.size() < 2 ) 
             std::cout << "Planner not correctly initialized" << std::endl;
@@ -532,6 +561,7 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
 			std::cout << "Pose: [" << i << "]: " << "(" << nav_poses[i].position.x << " " << nav_poses[i].position.y << " " << nav_poses[i].position.z << ")" << std::endl;
 		}
 	}
+	
 }
 
 
