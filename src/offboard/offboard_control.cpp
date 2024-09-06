@@ -61,19 +61,37 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	boost::thread key_input_t( &OffboardControl::key_input, this );
 
 	//---Init planner
-	_xbounds[0] = -5.0;
-	_xbounds[1] = 21.0;
-	_ybounds[0] = -5.0;
-	_ybounds[1] = 11.0;
-	_zbounds[0] = -1.0;
-	_zbounds[1] = 5.0;
-	_robot_radius = 0.4;
+
 	
-	// TODO: add paramters
-	// double robot_radius;
-	// this->declare_parameter("robot_radius",0.1);
-	// robot_radius = this->get_parameter("robot_radius").as_double();
-	// RCLCPP_INFO(get_logger(), "robot_radius: %f", robot_radius);
+	this->declare_parameter("robot_radius",0.1);
+	_robot_radius = this->get_parameter("robot_radius").as_double();
+	RCLCPP_INFO(get_logger(), "robot_radius: %f", _robot_radius);
+
+	this->declare_parameter("x_lower_bound", -5.0);
+	_xbounds[0] = this->get_parameter("x_lower_bound").as_double();
+	RCLCPP_INFO(get_logger(), "x_lower_bound: %f", _xbounds[0]);
+	
+	this->declare_parameter("x_upper_bound",21.0);
+	_xbounds[1] = this->get_parameter("x_upper_bound").as_double();
+	RCLCPP_INFO(get_logger(), "x_upper_bound: %f", _xbounds[1] );
+
+	this->declare_parameter("y_lower_bound", -5.0);
+	_ybounds[0] = this->get_parameter("y_lower_bound").as_double();
+	RCLCPP_INFO(get_logger(), "y_lower_bound: %f", _ybounds[0]);
+	
+	this->declare_parameter("y_upper_bound",21.0);
+	_ybounds[1] = this->get_parameter("y_upper_bound").as_double();
+	RCLCPP_INFO(get_logger(), "y_upper_bound: %f", _ybounds[1] );
+
+
+	this->declare_parameter("z_lower_bound", -5.0);
+	_zbounds[0] = this->get_parameter("z_lower_bound").as_double();
+	RCLCPP_INFO(get_logger(), "z_lower_bound: %f", _ybounds[0]);
+	
+	this->declare_parameter("z_upper_bound",21.0);
+	_zbounds[1] = this->get_parameter("z_upper_bound").as_double();
+	RCLCPP_INFO(get_logger(), "z_upper_bound: %f", _ybounds[1] );
+
 
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
