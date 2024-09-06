@@ -74,7 +74,7 @@
 #include "planner_spline.h"
 
 //3d path planner --> (https://github.com/jocacace/pplanner)
-#include "planner/planner.h" 
+#include "planner.h" 
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
