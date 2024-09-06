@@ -152,7 +152,7 @@ void OffboardControl::key_input() {
 	double duration;
 	float  yaw;
 	while(!exit && rclcpp::ok()) {
-		std::cout << "Enter command [arm | go | takeoff | land | stop | nav]: \n"; 
+		std::cout << "Enter command [arm | go | takeoff | land | stop | nav | term]: \n"; 
 		std::cin >> cmd;
 		if(cmd == "go") {
 			std::cout << "Enter X coordinate: "; 
@@ -203,7 +203,7 @@ void OffboardControl::key_input() {
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
-			_prev_sp(2) = 0.0; 
+			_prev_sp(2) = 0.5; 
 			startTraj(_prev_sp, yaw, 15);
 			
 		}
@@ -212,7 +212,11 @@ void OffboardControl::key_input() {
 			rclcpp::shutdown();
 		}
 		else if(cmd == "arm") {
+			this->flight_termination(0);
 			this->arm();
+		}
+		else if(cmd == "term") {
+			this->flight_termination(1);
 		}
 		else {
 			std::cout << "Unknown command;\n";
@@ -233,6 +237,12 @@ void OffboardControl::disarm() {
 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
 
 	RCLCPP_INFO(this->get_logger(), "Disarm command send");
+}
+
+void OffboardControl::flight_termination(float value){
+	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_FLIGHTTERMINATION, value);
+
+	RCLCPP_INFO(this->get_logger(), "Flight Termination command send");
 }
 
 
@@ -377,8 +387,8 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	geometry_msgs::msg::PoseStamped p;
 	double t;
 
-	if(pos(2) > 0.0f)
-		pos(2) *= -1;
+	// if(pos(2) > 0.0f)
+	// 	pos(2) *= -1;
 
 	matrix::Quaternionf att(matrix::Eulerf(0, 0, yaw));
 

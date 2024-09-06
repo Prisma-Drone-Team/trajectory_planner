@@ -105,6 +105,9 @@ public:
 	void key_input();
 
 
+	void flight_termination(float val);
+
+
 private:
 	void timer_callback();
 
