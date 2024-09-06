@@ -11,6 +11,12 @@ In a third terminal run the trajectory planner node
 
        $ ros2 run trajectory_planner offboard_control 
 
+To include params
+       
+       $ ros2 run trajectory_planner offboard_control --ros-args -p param_file:=<path_to_param_file> 
+
+       $ ros2 run trajectory_planner offboard_control --ros-args -p /root/ros2_ws/src/pkg/trajectory_planner/config/params.yaml
+
 ## Features
 
 Arming routine
