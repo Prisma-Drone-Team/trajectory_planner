@@ -436,7 +436,7 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
     
     s.position.x = _last_pos_sp(0); 
     s.position.y = _last_pos_sp(1);
-    s.position.z = _last_pos_sp(2);
+    s.position.z = -_last_pos_sp(2);
     s.orientation.w = 1.0;
     s.orientation.x = 0.0;
     s.orientation.y = 0.0;
@@ -475,28 +475,27 @@ void OffboardControl::plan(Eigen::Vector3d wp) {
     double xbounds[2];
     double ybounds[2];
     double zbounds[2];
-    // double bz_min = 0.0; //( _w_p[2] < wp[2] ) ?   
-    // double bz_max = 0.0; 
+    double bz_min = 0.0; //( _w_p[2] < wp[2] ) ?   
+    double bz_max = 0.0; 
+	Eigen::Vector3f _w_p;
+	_w_p << _position(0), _position(1), _position(2);
 
-    // if (  _w_p[2] < wp[2]  ) {
-    //     bz_min = _w_p[2];
-    //     bz_max = wp[2];
-    // }
-    // else {
-    //     bz_min = wp[2];
-    //     bz_max = _w_p[2];
-    // }
-
+    if (  _w_p[2] < wp[2]  ) {
+        bz_min = _w_p[2];
+        bz_max = wp[2];
+    }
+    else {
+        bz_min = wp[2];
+        bz_max = _w_p[2];
+    }
 
     xbounds[0] = _x_valid_min;
     ybounds[0] = _y_valid_min;
-    //zbounds[0] = bz_min - _z_motion_threshold; //param?
-	zbounds[0] = -_z_motion_threshold;
+    zbounds[0] = bz_min - _z_motion_threshold; //param?
 
     xbounds[1] = _x_valid_max;
     ybounds[1] = _y_valid_max;
-    //zbounds[1] = bz_max + _z_motion_threshold; 
-    zbounds[1] = _z_motion_threshold;
+    zbounds[1] = bz_max + _z_motion_threshold; 
 
     int ret = _pp->plan(2, xbounds, ybounds, zbounds, poses, opt_poses);
 
