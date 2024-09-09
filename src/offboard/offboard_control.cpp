@@ -248,7 +248,7 @@ void OffboardControl::key_input() {
 
 			this->arm();
 
-			startTraj(_prev_sp, yaw_d, yaw_time); 
+			//startTraj(_prev_sp, yaw_d, yaw_time); 
 			startTraj(sp, yaw_d, duration);
 
 			_prev_sp = sp;
