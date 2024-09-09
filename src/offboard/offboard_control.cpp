@@ -132,7 +132,11 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
-    //---
+    
+	_T_enu_to_ned.setZero();
+	_T_enu_to_ned(0,1) =  1.0;
+	_T_enu_to_ned(1,0) =  1.0;
+	_T_enu_to_ned(2,2) = -1.0;
 }
 
 void OffboardControl::timer_callback() {
@@ -171,18 +175,17 @@ void OffboardControl::key_input() {
 		std::cout << "Enter command [arm | go | takeoff | land | stop | nav | term]: \n"; 
 		std::cin >> cmd;
 		if(cmd == "go") {
-			std::cout << "Enter X coordinate: "; 
+			std::cout << "Enter X coordinate (ENU frame): "; 
 			std::cin >> sp(0);
-			std::cout << "Enter Y coordinate: "; 
+			std::cout << "Enter Y coordinate (ENU frame): "; 
 			std::cin >> sp(1);
-			std::cout << "Enter Z coordinate: "; 
+			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> sp(2);
-			// std::cout << "Enter yaw: "; 
-			// std::cin >> yaw;
-			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-			// std::cout << "Enter duration: "; 
-			// std::cin >> duration;
+			
+			sp = _T_enu_to_ned*sp;
 
+			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+			
 			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
 
@@ -195,11 +198,11 @@ void OffboardControl::key_input() {
 		}
 		else if(cmd=="nav"){
 			Eigen::Vector3d wp;
-			std::cout << "Enter X coordinate: "; 
+			std::cout << "Enter X coordinate (ENU frame): "; 
 			std::cin >> wp[0];
-			std::cout << "Enter Y coordinate: "; 
+			std::cout << "Enter Y coordinate (ENU frame): "; 
 			std::cin >> wp[1];
-			std::cout << "Enter Z coordinate: "; 
+			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> wp[2];
 
 			//std::vector<POSE>* opt_poses;
@@ -207,7 +210,10 @@ void OffboardControl::key_input() {
 			plan(wp,opt_poses);
 
 			for(int i = 0; i<int(opt_poses->size()); i++) {
-				matrix::Vector3f sp((*opt_poses)[i].position.x, (*opt_poses)[i].position.y, -(*opt_poses)[i].position.z);    // TODO proper conversion
+				matrix::Vector3f sp((*opt_poses)[i].position.x, (*opt_poses)[i].position.y, (*opt_poses)[i].position.z);    // TODO proper conversion
+				
+				sp = _T_enu_to_ned*sp;
+
 				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 				double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 				double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
@@ -233,13 +239,30 @@ void OffboardControl::key_input() {
 		// 	}
 		// }
 		else if(cmd == "takeoff") {
-			float alt;
-			std::cout << "Enter altitude: "; 
-			std::cin >> alt;
+			// float alt;
+			// std::cout << "Enter altitude: "; 
+			// std::cin >> alt;
+			// alt = alt > 0 ? -alt : alt;
+			// takeoffTraj(alt);                   // TODO check time logic 
+			// _prev_sp(2) = alt;   
+			sp(0) = _position(1);   
+			sp(1) = _position(0);
+			std::cout << "Enter takeoff altitude (ENU frame): "; 
+			std::cin >> sp(2);
+			
+			sp = _T_enu_to_ned*sp;
+			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+			
+			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
 			this->arm();
-			alt = alt > 0 ? -alt : alt;
-			takeoffTraj(alt);                   // TODO check time logic 
-			_prev_sp(2) = alt;                    
+
+			startTraj(_prev_sp, yaw_d, yaw_time); 
+			startTraj(sp, yaw_d, duration);
+
+			_prev_sp = sp;
+			_prev_yaw_sp = yaw_d;                 
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";

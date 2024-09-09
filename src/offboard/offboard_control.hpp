@@ -182,4 +182,6 @@ private:
 
 	double _max_yaw_rate, _max_velocity;
 
+	matrix::Matrix3f _T_enu_to_ned;
+
 };
