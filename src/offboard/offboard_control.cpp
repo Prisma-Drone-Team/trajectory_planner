@@ -64,6 +64,14 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				}
 			});
 
+		// ------------- ADD OCTOMAP CALLBACK ---------------
+		// void NAV_EXEC::octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
+		// 	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*msg);
+		// 	octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
+		// 	_pp->set_octo_tree(tree_oct); // <-- crea ostacoli per il planner(?)
+		// 	_map_set = true;
+		// }	
+
 	_offboard_setpoint_counter = 0;
 
 
@@ -172,7 +180,7 @@ void OffboardControl::key_input() {
 	double duration;
 	float  yaw_d;
 	while(!exit && rclcpp::ok()) {
-		std::cout << "Enter command [arm | go | takeoff | land | stop | nav | term]: \n"; 
+		std::cout << "Enter command [arm | takeoff | go | nav | land | term | stop]: \n"; 
 		std::cin >> cmd;
 		if(cmd == "go") {
 			std::cout << "Enter X coordinate (ENU frame): "; 
@@ -226,32 +234,14 @@ void OffboardControl::key_input() {
 			}
 
 		}
-		// else if(cmd == "traj") {
-		// 	if(!_traj_present) {
-		// 		std::cout << "Trajectory not loaded correctly!\n";
-		// 		continue;
-		// 	}
-		// 	for(int i = 0; i<int(_traj_points.size()); i+=7) {
-		// 		matrix::Vector3f sp(_traj_points[i], _traj_points[i+1], _traj_points[i+2]);
-		// 		float yaw   = _traj_points[i+3];
-		// 		double duration = _traj_points[i+4];
-		// 		startTraj(sp, yaw, duration);
-		// 	}
-		// }
 		else if(cmd == "takeoff") {
-			// float alt;
-			// std::cout << "Enter altitude: "; 
-			// std::cin >> alt;
-			// alt = alt > 0 ? -alt : alt;
-			// takeoffTraj(alt);                   // TODO check time logic 
-			// _prev_sp(2) = alt;   
 			sp(0) = _position(1);   
 			sp(1) = _position(0);
 			std::cout << "Enter takeoff altitude (ENU frame): "; 
 			std::cin >> sp(2);
 			
 			sp = _T_enu_to_ned*sp;
-			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
 			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
@@ -295,7 +285,6 @@ void OffboardControl::arm() {
 	RCLCPP_INFO(this->get_logger(), "Arm command send");
 }
 
-
 void OffboardControl::disarm() {
 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
 
@@ -307,7 +296,6 @@ void OffboardControl::flight_termination(float value){
 
 	RCLCPP_INFO(this->get_logger(), "Flight Termination command send");
 }
-
 
 void OffboardControl::publish_offboard_control_mode() {
 	OffboardControlMode msg{};
@@ -323,7 +311,6 @@ void OffboardControl::publish_offboard_control_mode() {
 
 	_offboard_control_mode_publisher->publish(msg);
 }
-
 
 void OffboardControl::publish_trajectory_setpoint() {
 	TrajectorySetpoint msg{};
@@ -350,7 +337,6 @@ void OffboardControl::publish_trajectory_setpoint() {
 
 	_trajectory_setpoint_publisher->publish(msg);
 }
-
 
 void OffboardControl::publish_vehicle_command(uint16_t command, float param1, float param2) {
 	VehicleCommand msg{};
@@ -497,7 +483,6 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	// auto end = steady_clock::now();
 }
 
-
 void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
 
     // if( _use_octomap ) {
@@ -584,7 +569,6 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	}
 	
 }
-
 
 int main(int argc, char* argv[]) {
 	std::cout << "Starting offboard control node..." << std::endl;
