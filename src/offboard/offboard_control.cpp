@@ -55,6 +55,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				}
 			});
 
+	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1)); 
+
 		// ------------- ADD OCTOMAP CALLBACK ---------------
 		// void NAV_EXEC::octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
 		// 	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*msg);
@@ -162,6 +164,93 @@ void OffboardControl::timer_callback() {
 		_offboard_setpoint_counter++;
 	}
 
+}
+
+void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg) {
+
+	std::string cmd = msg->command.data;
+	matrix::Vector3f sp;
+	sp(0) = msg->pose.position.x;
+	sp(1) = msg->pose.position.y;
+	sp(2) = msg->pose.position.z;	
+
+	double duration;
+	float  yaw_d;
+
+	if(cmd == "go") {
+	
+		sp = _T_enu_to_ned*sp;
+
+		yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+		
+		double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+		double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+		startTraj(_prev_sp, yaw_d, yaw_time); 
+		startTraj(sp, yaw_d, duration);
+
+		_prev_sp = sp;
+		_prev_yaw_sp = yaw_d;
+
+	}
+	else if(cmd=="nav"){
+		Eigen::Vector3d wp;
+		wp[0] = sp(0);
+		wp[1] = sp(1);
+		wp[2] = sp(2);
+
+		//std::vector<POSE>* opt_poses;
+		auto opt_poses = std::make_shared<std::vector<POSE>>();
+		plan(wp,opt_poses);
+
+		for(int i = 0; i<int(opt_poses->size()); i++) {
+			matrix::Vector3f sp((*opt_poses)[i].position.x, (*opt_poses)[i].position.y, (*opt_poses)[i].position.z);    // TODO proper conversion
+			
+			sp = _T_enu_to_ned*sp;
+
+			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+			startTraj(_prev_sp, yaw_d, yaw_time); 
+			startTraj(sp, yaw_d, duration);
+
+			_prev_sp = sp;
+			_prev_yaw_sp = yaw_d;
+		}
+
+	}
+	else if(cmd == "takeoff") {
+		sp(0) = _position(1);   
+		sp(1) = _position(0);
+		
+		
+		sp = _T_enu_to_ned*sp;
+		yaw_d = matrix::Eulerf(_attitude).psi(); 
+		
+		double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+		double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+		this->arm();
+
+		//startTraj(_prev_sp, yaw_d, yaw_time); 
+		startTraj(sp, yaw_d, duration);
+
+		_prev_sp = sp;
+		_prev_yaw_sp = yaw_d;                 
+	}
+	else if(cmd == "land") {
+		_prev_sp(2) = 0.5; 
+		startTraj(_prev_sp, yaw_d, 15);	 // TODO tune time
+	}
+	else if(cmd == "arm") {
+		_first_traj = false;
+		this->flight_termination(0);
+		this->arm();
+	}
+	else if(cmd == "term") {
+		this->flight_termination(1);		 // TODO unire term a land (check odometry feedback)
+	}
 }
 
 void OffboardControl::key_input() {
