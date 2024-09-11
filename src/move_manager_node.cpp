@@ -27,7 +27,8 @@ class MoveManager : public rclcpp::Node
             auto _timer_period = std::chrono::milliseconds(1000);
         
             RCLCPP_INFO(this->get_logger(), "Move Manager node started, ready to send signals");
-            _publisher = this->create_publisher<trajectory_planner::msg::MoveCmd>("move_cmd",qos);
+          
+            _publisher = this->create_publisher<trajectory_planner::msg::MoveCmd>("move_cmd",qos);  // IMPORTANT: check QoS settings
 
             _tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
             _static_tf_broadcaster = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
@@ -101,27 +102,18 @@ class MoveManager : public rclcpp::Node
                     std::cin >> sp.position.z;
                     
                     // sp = _T_enu_to_ned*sp;  // No conversione here
-                    send_move_cmd(_cmd,sp);
+                   // send_move_cmd(_cmd,sp);
                 }
                 else if(_cmd == "takeoff") {
                     std::cout << "Enter takeoff altitude (ENU frame): "; 
                     std::cin >> sp.position.z;
-                    send_move_cmd(_cmd,sp);
+                   // send_move_cmd(_cmd,sp);
                 }
-                else if(_cmd == "land") {
-                    std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
-                    send_move_cmd(_cmd,sp);
+                else if(_cmd != "arm" && _cmd != "takeoff" && _cmd != "go" && _cmd != "nav" && _cmd != "land" && _cmd != "term") {
+                    RCLCPP_ERROR_ONCE(this->get_logger(), "Unknown command");
                 }
-                else if(_cmd == "arm") {
-                    send_move_cmd(_cmd,sp);
-                }
-                else if(_cmd == "term") {
-                   send_move_cmd(_cmd,sp);
-                }
-                else {
-                    std::cout << "Unknown command;\n";
-                }
-
+                
+                send_move_cmd(_cmd,sp);
             }
 
             

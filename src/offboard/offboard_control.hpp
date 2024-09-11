@@ -112,6 +112,7 @@ public:
 
 private:
 	void timer_callback();
+	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 
 	bool _first_odom{false};
 	bool _first_traj{false};
@@ -132,6 +133,7 @@ private:
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
+	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -185,5 +187,6 @@ private:
 	double _max_yaw_rate, _max_velocity;
 
 	matrix::Matrix3f _T_enu_to_ned;
+
 
 };
