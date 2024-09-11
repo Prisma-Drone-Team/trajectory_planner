@@ -265,19 +265,19 @@ void CARTESIAN_PLANNER::set_waypoints(std::vector<geometry_msgs::msg::PoseStampe
 	_poses = poses;
 	_times = times;
 	_N = _poses.size();
-	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Number of points received: %d", _N);
-	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Number of times received:  %d", _times.size());
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting point: %10.5f, %10.5f, %10.5f",
-					_poses[0].pose.position.x, _poses[0].pose.position.y, _poses[0].pose.position.z);
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final point:    %10.5f, %10.5f, %10.5f",
-					_poses[_N-1].pose.position.x, _poses[_N-1].pose.position.y, _poses[_N-1].pose.position.z);
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting time:  %f", _times.front());
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final time:     %f", _times.back());
+	// // RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Number of points received: %d", _N);
+	// // RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Number of times received:  %d", _times.size());
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting point: %10.5f, %10.5f, %10.5f",
+	// 				_poses[0].pose.position.x, _poses[0].pose.position.y, _poses[0].pose.position.z);
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final point:    %10.5f, %10.5f, %10.5f",
+	// 				_poses[_N-1].pose.position.x, _poses[_N-1].pose.position.y, _poses[_N-1].pose.position.z);
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting time:  %f", _times.front());
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final time:     %f", _times.back());
 
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting quat: %10.5f, %10.5f, %10.5f, %10.5f",
-					_poses[0].pose.orientation.w, _poses[0].pose.orientation.x, _poses[0].pose.orientation.y, _poses[0].pose.orientation.z);
-	RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final quat:    %10.5f, %10.5f, %10.5f, %10.5f",
-					_poses[_N-1].pose.orientation.w, _poses[_N-1].pose.orientation.x, _poses[_N-1].pose.orientation.y, _poses[_N-1].pose.orientation.z);
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Starting quat: %10.5f, %10.5f, %10.5f, %10.5f",
+	// 				_poses[0].pose.orientation.w, _poses[0].pose.orientation.x, _poses[0].pose.orientation.y, _poses[0].pose.orientation.z);
+	// RCLCPP_INFO(rclcpp::get_logger("CARTESIAN"), "Final quat:    %10.5f, %10.5f, %10.5f, %10.5f",
+	// 				_poses[_N-1].pose.orientation.w, _poses[_N-1].pose.orientation.x, _poses[_N-1].pose.orientation.y, _poses[_N-1].pose.orientation.z);
 
 	_xdi = Eigen::VectorXd::Zero(6);
 	_xdf = Eigen::VectorXd::Zero(6);
