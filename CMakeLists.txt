@@ -16,12 +16,13 @@ find_package(std_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
 	system 
 	thread 
 	program_options
 )
-find_package(tf2 REQUIRED)
 find_package(rosidl_default_generators REQUIRED)  # To geneate custom message
 
 find_package(ompl REQUIRED)
@@ -60,7 +61,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs Boost)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs Boost tf2 tf2_ros)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 ############
