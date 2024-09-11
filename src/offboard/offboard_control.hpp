@@ -73,8 +73,11 @@
 #include "Trajectory.hpp"
 #include "planner_spline.h"
 
-//3d path planner --> (https://github.com/jocacace/pplanner)
 #include "planner.h" 
+
+#include "octomap_msgs/msg/octomap.hpp"
+#include <octomap_msgs/conversions.h>
+#include <octomap/AbstractOcTree.h>
 
 #include "trajectory_planner/msg/move_cmd.hpp"
 
@@ -134,6 +137,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
+	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr octomap_sub_;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -187,6 +191,7 @@ private:
 	double _max_yaw_rate, _max_velocity;
 
 	matrix::Matrix3f _T_enu_to_ned;
-
-
+	bool _map_set, _replan;
+	double _use_octomap, _rviz_output, _dist_from_th_error;
+	int _replan_cnt;
 };

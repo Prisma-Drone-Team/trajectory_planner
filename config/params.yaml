@@ -21,11 +21,11 @@ offboard_control:
     dist_from_error: 0.3
     kp_vs: 0.2
 
-    use_octomap: true
+    use_octomap: 0.0 # BOOL
     cv: 0.5
     cv_to: 0.2
     cv_rot: 0.3
-    rviz_output: true
+    rviz_output: 0.0 # BOOL
     id_to_follow: 16
     marker_timeout: 0.1
 

@@ -57,13 +57,19 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 
 	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1)); 
 
-		// ------------- ADD OCTOMAP CALLBACK ---------------
-		// void NAV_EXEC::octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
-		// 	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*msg);
-		// 	octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
-		// 	_pp->set_octo_tree(tree_oct); // <-- crea ostacoli per il planner(?)
-		// 	_map_set = true;
-		// }	
+		
+		octomap_sub_ = this->create_subscription<octomap_msgs::msg::Octomap>(
+		"/rtabmap/octomap_binary", qos,
+		[this](const octomap_msgs::msg::Octomap::UniquePtr msg) {
+			octomap::AbstractOcTree* tree = octomap_msgs::fullMsgToMap(*msg);  // Use the appropriate conversion function
+			octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(tree);
+			if (octree) {
+				_pp->set_octo_tree(octree);
+				_map_set = true;
+			} else {
+				RCLCPP_WARN(this->get_logger(), "Failed to cast AbstractOcTree to OcTree");
+			}
+		});	
 
 	_offboard_setpoint_counter = 0;
 
@@ -130,6 +136,14 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_z_motion_threshold = this->get_parameter("z_motion_threshold").as_double();
 	RCLCPP_INFO(get_logger(), "z_motion_threshold: %f", _z_motion_threshold);
 
+	this->declare_parameter("use_octomap",1.0);
+	_use_octomap = this->get_parameter("use_octomap").as_double(); // as_bool not working
+	RCLCPP_INFO(get_logger(), "use_octomap: %f", _use_octomap);
+
+	this->declare_parameter("rviz_output",1.0);
+	_rviz_output = this->get_parameter("rviz_output").as_double(); // as_bool not working
+	RCLCPP_INFO(get_logger(), "rviz_output: %f", _rviz_output);	
+
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
@@ -138,6 +152,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_T_enu_to_ned(0,1) =  1.0;
 	_T_enu_to_ned(1,0) =  1.0;
 	_T_enu_to_ned(2,2) = -1.0;
+
+	_map_set = false;
 }
 
 void OffboardControl::timer_callback() {
@@ -174,7 +190,6 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 	sp(1) = msg->pose.position.y;
 	sp(2) = msg->pose.position.z;	
 
-	double duration;
 	float  yaw_d;
 
 	if(cmd == "go") {
@@ -202,6 +217,7 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 		//std::vector<POSE>* opt_poses;
 		auto opt_poses = std::make_shared<std::vector<POSE>>();
 		plan(wp,opt_poses);
+		std::cout <<"DEBUG--------------------- "<< opt_poses->size()<<std::endl;
 
 		for(int i = 0; i<int(opt_poses->size()); i++) {
 			matrix::Vector3f sp((*opt_poses)[i].position.x, (*opt_poses)[i].position.y, (*opt_poses)[i].position.z);    // TODO proper conversion
@@ -211,6 +227,8 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 			double yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			double duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+			
+			std::cout <<"DEBUG: " << sp(0) <<", " << sp(1) <<", " << sp(2) <<std::endl;
 
 			startTraj(_prev_sp, yaw_d, yaw_time); 
 			startTraj(sp, yaw_d, duration);
@@ -565,16 +583,17 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 
 void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
 
-    // if( _use_octomap ) {
-    //     while(!_map_set) usleep(0.1*1e6);
-    // }
+    if( _use_octomap == 1.0) {
+        while(!_map_set) usleep(0.1*1e6);
+    }
 
     POSE s;
     POSE g;
     
-    s.position.x = _last_pos_sp(0); 
-    s.position.y = _last_pos_sp(1);
-    s.position.z = -_last_pos_sp(2);
+	matrix::Vector3f prev_sp = _T_enu_to_ned*_prev_sp; 
+    s.position.x = prev_sp(0); 
+    s.position.y = prev_sp(1);
+    s.position.z = prev_sp(2);
     s.orientation.w = 1.0;
     s.orientation.x = 0.0;
     s.orientation.y = 0.0;
@@ -641,7 +660,7 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
             std::cout << "Planner not correctly initialized" << std::endl;
 	else {
 
-		std::cout << "Solution: " << std::endl;
+		std::cout << "Solution (not optimal): " << std::endl;
 		
 		for(int i=0; i<nav_poses.size(); i++ ) {
 			std::cout << "Pose: [" << i << "]: " << "(" << nav_poses[i].position.x << " " << nav_poses[i].position.y << " " << nav_poses[i].position.z << ")" << std::endl;
