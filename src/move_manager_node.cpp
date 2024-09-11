@@ -12,6 +12,11 @@
 #include <boost/thread.hpp>
 #include "trajectory_planner/msg/move_cmd.hpp"
 
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <px4_msgs/msg/vehicle_odometry.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include "tf2_ros/static_transform_broadcaster.h"
+
 class MoveManager : public rclcpp::Node
 {
     public:
@@ -24,8 +29,44 @@ class MoveManager : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Move Manager node started, ready to send signals");
             _publisher = this->create_publisher<trajectory_planner::msg::MoveCmd>("move_cmd",qos);
 
+            _tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+            _static_tf_broadcaster = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+
+            this->staticTfPub();
+
+            rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+		    auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+
+            _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("fmu/out/vehicle_odometry", qos_px4,
+                [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
+                    // Prepare the TransformStamped message
+                    geometry_msgs::msg::TransformStamped transform_stamped;
+
+                    // Set the header
+                    transform_stamped.header.stamp = this->get_clock()->now();
+                    transform_stamped.header.frame_id = "mapNED";  // Set to appropriate frame (ENU)
+                    transform_stamped.child_frame_id = "drone_link";  // Set to appropriate frame
+
+                    // Set translation (position)
+                    transform_stamped.transform.translation.x = msg->position[0];
+                    transform_stamped.transform.translation.y = msg->position[1];
+                    transform_stamped.transform.translation.z = msg->position[2];
+
+                    // Set rotation (orientation)
+                    transform_stamped.transform.rotation.x = msg->q.data()[0];
+                    transform_stamped.transform.rotation.y = msg->q.data()[1];
+                    transform_stamped.transform.rotation.z = msg->q.data()[2];
+                    transform_stamped.transform.rotation.w = msg->q.data()[3];
+
+                    // Broadcast the transform
+                    _tf_broadcaster->sendTransform(transform_stamped);
+
+                });
+            
+
             //_timer = this->create_wall_timer(_timer_period, std::bind(&MoveManager::key_input, this));
             boost::thread key_input_t( &MoveManager::key_input, this);
+
         }
 
         void send_move_cmd(const std::string& cmd, const geometry_msgs::msg::Pose& pose)
@@ -86,8 +127,36 @@ class MoveManager : public rclcpp::Node
             
         }
 
+        void staticTfPub(){
+            // CHECK conversion from ENU to NED + move in the launch file static transforms
+            geometry_msgs::msg::TransformStamped t;
+
+            t.header.stamp = this->get_clock()->now();
+            t.header.frame_id = "map";
+            t.child_frame_id = "mapNED";
+
+            t.transform.translation.x = 0.0;
+            t.transform.translation.y = 0.0;
+            t.transform.translation.z = 0.0;
+
+            t.transform.rotation.x = 0.7071068;
+            t.transform.rotation.y = 0.7071068;
+            t.transform.rotation.z = 0.0;
+            t.transform.rotation.w = 0.0;
+
+            _static_tf_broadcaster->sendTransform(t);
+        }
+
     private:
+    
         rclcpp::Publisher<trajectory_planner::msg::MoveCmd>::SharedPtr _publisher;
+        // Subscriber for vehicle odometry
+        rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odometry_sub;
+
+        // TF broadcaster
+        std::shared_ptr<tf2_ros::TransformBroadcaster> _tf_broadcaster;
+        std::shared_ptr<tf2_ros::StaticTransformBroadcaster> _static_tf_broadcaster;
+
         rclcpp::TimerBase::SharedPtr _timer;
         std::string _cmd;
 
