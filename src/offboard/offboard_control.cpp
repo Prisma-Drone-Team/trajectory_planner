@@ -2,15 +2,6 @@
 
 #include <cmath>
 
-// TODO -----------------------------------------------------------------------------------------
-/*
-	1. checker thread ( IDEA: add  _plan_is_valid flag to evluate)
-	2. manager node (publish a string with "nav" command "land" etc. )
-	3. add a way to control also yaw (no fixed heading)
-	5. octomap integration (subscription etc.)
-
-*/
-// END - TODO -----------------------------------------------------------------------------------
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
