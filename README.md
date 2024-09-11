@@ -5,6 +5,9 @@
 3. octomap integration (subscription etc.)
 4. state machine for current navigation state (publish it?)
 
+#NB: 
+ROS2 PX4 only works with NED frames. It is necessary to properly think the map bounds and frame transformation to avoid problem with ompl. (e.g. x-y are swapped between enu-ned and the arena is rectangular -> the planner gets stuck thinking the drone is outside the map)
+
 - Drone Manager node:
   1. Implement keyboard command input and msg publish
 
