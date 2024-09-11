@@ -76,6 +76,8 @@
 //3d path planner --> (https://github.com/jocacace/pplanner)
 #include "planner.h" 
 
+#include "trajectory_planner/msg/move_cmd.hpp"
+
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace px4_msgs::msg;

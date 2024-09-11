@@ -12,6 +12,7 @@ find_package(builtin_interfaces REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -21,6 +22,8 @@ find_package(Boost REQUIRED COMPONENTS
 	program_options
 )
 find_package(tf2 REQUIRED)
+find_package(rosidl_default_generators REQUIRED)  # To geneate custom message
+find_package(trajectory_planner REQUIRED)  
 
 find_package(ompl REQUIRED)
 find_package(fcl REQUIRED)
@@ -47,7 +50,7 @@ target_include_directories(frame_transforms PUBLIC
 
 # /offboard_control
 add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/spline/planner_spline.cpp src/offboard/planner/planner.cpp)
-ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl )
+ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl trajectory_planner)
 target_include_directories(offboard_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
@@ -58,7 +61,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs trajectory_planner)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 ############
@@ -99,6 +102,10 @@ install(TARGETS frame_transforms
 # Install launch files.
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME}/)
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/MoveCmd.msg"
+  DEPENDENCIES geometry_msgs std_msgs # Add packages that above messages depend on, in this case geometry_msgs for Sphere.msg
+)
 
 
 if(BUILD_TESTING)
