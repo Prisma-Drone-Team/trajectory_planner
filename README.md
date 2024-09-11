@@ -6,7 +6,7 @@
 4. state machine for current navigation state (publish it?)
 
 - Drone Manager node:
-  1. Define how it communicates with the planner: define the message structure  --- string with specific structure or custom msg (eg. Header + String + Pose) ---
+  1. Implement keyboard command input and msg publish
 
 # 4D_trajectory_planning
 ROS2 node to plan cartesian trajectory for a standard px4-based UAV  
