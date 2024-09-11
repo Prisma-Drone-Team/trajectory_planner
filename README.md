@@ -8,6 +8,9 @@
 - Drone Manager node:
   1. Implement keyboard command input and msg publish
 
+# NB: 
+ROS2 PX4 only works with NED frames. It is necessary to properly think the map bounds and frame transformation to avoid problem with ompl. (e.g. x-y are swapped between enu-ned and the arena is rectangular -> the planner gets stuck thinking the drone is outside the map)
+
 # 4D_trajectory_planning
 ROS2 node to plan cartesian trajectory for a standard px4-based UAV  
 
