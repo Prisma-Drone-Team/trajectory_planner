@@ -9,6 +9,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <chrono>
+#include "trajectory_planner/msg/move_cmd.hpp"
 
 class MoveManager : public rclcpp::Node
 {
