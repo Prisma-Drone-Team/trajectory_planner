@@ -75,8 +75,9 @@
 
 #include "planner.h" 
 
-#include "octomap_msgs/msg/octomap.hpp"
-#include <octomap_msgs/conversions.h>
+#include <octomap/octomap.h>
+#include "octomap_msgs/conversions.h"
+#include <octomap_msgs/msg/octomap.hpp>
 #include <octomap/AbstractOcTree.h>
 
 #include "trajectory_planner/msg/move_cmd.hpp"
@@ -125,7 +126,9 @@ private:
 	float _timer_freq{100.0f};
 
 	CARTESIAN_PLANNER _trajectory{_timer_freq};
-	void firstTraj();
+	//CARTESIAN_PLANNER _tmp_trajectory{_timer_freq};
+
+	//void firstTraj();
 	void takeoffTraj(float alt);
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
@@ -137,7 +140,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
-	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr octomap_sub_;
+	// rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr octomap_sub_;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 

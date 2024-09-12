@@ -19,6 +19,8 @@
   <depend>px4_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>octomap_msgs</depend>
+  <depend>octomap</depend>
 
   <depend>launch</depend>
   <depend>launch_testing</depend>
