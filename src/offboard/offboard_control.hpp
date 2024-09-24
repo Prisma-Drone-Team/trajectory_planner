@@ -53,6 +53,8 @@
 #include <px4_msgs/msg/timesync_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
+#include <octomap_msgs/msg/octomap.hpp>
+#include <octomap_msgs/conversions.h>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -113,6 +115,7 @@ public:
 private:
 	void timer_callback();
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
+	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 
 	bool _first_odom{false};
 	bool _first_traj{false};
@@ -134,6 +137,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
+	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -144,6 +148,8 @@ private:
 
 	std::vector<double> _traj_points;
 	bool _traj_present = false;
+	bool _map_set;
+	bool _use_octomap;
 
 	uint64_t _offboard_setpoint_counter;   //!< counter for the number of setpoints sent
 

@@ -57,6 +57,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 
 	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1)); 
 
+	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>("/rtabmap/octomap_binary", qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
+
 		// ------------- ADD OCTOMAP CALLBACK ---------------
 		// void NAV_EXEC::octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
 		// 	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*msg);
@@ -71,6 +73,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_timer = this->create_wall_timer(_timer_period, std::bind(&OffboardControl::timer_callback, this));
 
 	boost::thread key_input_t( &OffboardControl::key_input, this );
+	_map_set = false;
 
 	//---Init planner
 	this->declare_parameter("max_yaw_rate", .5);
@@ -130,6 +133,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_z_motion_threshold = this->get_parameter("z_motion_threshold").as_double();
 	RCLCPP_INFO(get_logger(), "z_motion_threshold: %f", _z_motion_threshold);
 
+	this->declare_parameter("use_octomap",1.0);
+	_use_octomap = this->get_parameter("use_octomap").as_double();
+	RCLCPP_INFO(get_logger(), "use_octomap: %f", _use_octomap);
+
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
@@ -164,6 +171,13 @@ void OffboardControl::timer_callback() {
 		_offboard_setpoint_counter++;
 	}
 
+}
+
+void OffboardControl::octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg ) {
+	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*octo_msg);
+    octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
+	_pp->set_octo_tree(tree_oct);
+	_map_set = true;
 }
 
 void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg) {
@@ -565,9 +579,9 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 
 void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
 
-    // if( _use_octomap ) {
-    //     while(!_map_set) usleep(0.1*1e6);
-    // }
+    if( _use_octomap ) {
+        while(!_map_set) usleep(0.1*1e6);
+    }
 
     POSE s;
     POSE g;

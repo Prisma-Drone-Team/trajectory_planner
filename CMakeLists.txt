@@ -18,6 +18,9 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(octomap_msgs REQUIRED)
+find_package(octomap REQUIRED)
+#find_package(octomap_ros REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
 	system 
 	thread 
@@ -30,6 +33,8 @@ find_package(fcl REQUIRED)
 include_directories(include 
   /opt/ros/humble/include/ompl-1.6
   #/usr/include/3dPathPlanner
+  ${octomap_INCLUDE_DIRS}
+  ${octomap_msgs_INCLUDE_DIRS}
 )
 
 # Add frame_transforms lib
@@ -50,13 +55,13 @@ target_include_directories(frame_transforms PUBLIC
 
 # /offboard_control
 add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/spline/planner_spline.cpp src/offboard/planner/planner.cpp)
-ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl)
+ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl octomap_msgs)
 target_include_directories(offboard_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   ${Eigen3_INCLUDE_DIRS}
 )
-target_link_libraries(offboard_control Eigen3::Eigen ${geometry_msgs_LIBRARIES} ${Boost_LIBRARIES} ${OMPL_LIBRARIES} fcl) # ${ompl_LIBRARIES} fcl)
+target_link_libraries(offboard_control Eigen3::Eigen ${geometry_msgs_LIBRARIES} ${Boost_LIBRARIES} ${OMPL_LIBRARIES} fcl ${octomap_LIBRARIES}) # ${ompl_LIBRARIES} fcl)
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
