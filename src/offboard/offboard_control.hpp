@@ -55,6 +55,8 @@
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include <octomap_msgs/msg/octomap.hpp>
 #include <octomap_msgs/conversions.h>
+#include <nav_msgs/msg/path.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -130,10 +132,12 @@ private:
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
 	void plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
+	void check_path( const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
+	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;

@@ -192,6 +192,7 @@ class PATH_PLANNER {
 
             fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(t));
             _tree_obj = std::shared_ptr<fcl::CollisionGeometry>(tree);
+            // std::cout<<"Octomap settata con "<<t->calcNumNodes()<<" nodi\n";
             
         }
 

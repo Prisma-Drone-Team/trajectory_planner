@@ -82,19 +82,19 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
     const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
 
     if( pos->values[0] < _x_bounds[0] || pos->values[0] > _x_bounds[1]) {
-        //std::cout << "X fault: " << pos->values[0] << " - " << _x_bounds[0] << ", " << _x_bounds[1] << std::endl;
+        std::cout << "X fault: " << pos->values[0] << " - " << _x_bounds[0] << ", " << _x_bounds[1] << std::endl;
         return false;
     }
     
     if( pos->values[1] < _y_bounds[0] || pos->values[1] > _y_bounds[1]) {
 
-        //std::cout << "Y fault: " << pos->values[1] << " - " << _y_bounds[0] << ", " << _y_bounds[1] << std::endl;
+        std::cout << "Y fault: " << pos->values[1] << " - " << _y_bounds[0] << ", " << _y_bounds[1] << std::endl;
         return false;
     }
     
     if( pos->values[2] < _z_bounds[0] || pos->values[2] > _z_bounds[1]) {
 
-        //std::cout << "Z fault: " << pos->values[2] << " - " << _z_bounds[0] << ", " << _z_bounds[1] << std::endl;
+        std::cout << "Z fault: " << pos->values[2] << " - " << _z_bounds[0] << ", " << _z_bounds[1] << std::endl;
         return false;
     }
     
@@ -107,7 +107,7 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
 
         // extract the second component of the state and cast it to what we expect
         const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-            
+        // std::cout<<pos->values[0]<<", "<<pos->values[1]<<", "<<pos->values[2]<<"\n";   
         // set the rototranslation of the robot considering the planned state
         fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
         fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
@@ -120,10 +120,11 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
         fcl::CollisionRequest requestType(1,false,1,false);
         fcl::CollisionResult collisionResult;
         fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
-
+        // std::cout<<"HO il TREEObject!\n";
         return(!collisionResult.isCollision());
     }
-    else {        
+    else {       
+        // std::cout<<"NON HO il TREEObject!\n";
         return true;
     } // No map available, return a valid state in anycase
 }
@@ -276,7 +277,7 @@ int PATH_PLANNER::optimize_path(const std::vector<POSE> & poses, const double de
  */
 //int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
 int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const double * ybounds, const double * zbounds, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
-    
+    std::cout<<"Entro nel planner\n";
     _x_bounds[0] = xbounds[0];
     _x_bounds[1] = xbounds[1];
     _y_bounds[0] = ybounds[0];
@@ -298,17 +299,17 @@ int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const doubl
 
     //-3: goal state not valid
     if( _goal.position.x < xbounds[0] || _goal.position.x > xbounds[1]) {
-        //std::cout << "X out of bounds: " << _goal.position.x << " (" << xbounds[0] << ", " << xbounds[1] << ")" << std::endl;
+        std::cout << "X out of bounds: " << _goal.position.x << " (" << xbounds[0] << ", " << xbounds[1] << ")" << std::endl;
         return -3;
     }
     
     if( _goal.position.y < ybounds[0] || _goal.position.y > ybounds[1]) {
-        //std::cout << "Y out of bounds: " << _goal.position.y << " (" << ybounds[0] << ", " << ybounds[1] << ")" << std::endl;
+        std::cout << "Y out of bounds: " << _goal.position.y << " (" << ybounds[0] << ", " << ybounds[1] << ")" << std::endl;
         return -3;
     }
     
     if( _goal.position.z < zbounds[0] || _goal.position.z > zbounds[1]) {
-        //std::cout << "Z out of bounds: " << _goal.position.z << " (" << zbounds[0] << ", " << zbounds[1] << ")" << std::endl;
+        std::cout << "Z out of bounds: " << _goal.position.z << " (" << zbounds[0] << ", " << zbounds[1] << ")" << std::endl;
         return -3;
     }
 
@@ -319,6 +320,7 @@ int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const doubl
     if( _random_start_state )
         start.random();
     else {
+        std::cout<<"Definisco lo start\n";
 	    start->setXYZ(_start.position.x, _start.position.y, _start.position.z);
         start->rotation().w = _start.orientation.w;
         start->rotation().x = _start.orientation.x;
@@ -329,6 +331,7 @@ int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const doubl
     if( _random_goal_state )
         goal.random();
     else {
+        std::cout<<"Definisco il goal\n";
         goal->setXYZ(_goal.position.x, _goal.position.y, _goal.position.z);
         goal->rotation().w = _goal.orientation.w;
         goal->rotation().x = _goal.orientation.x;
@@ -383,6 +386,9 @@ int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const doubl
 		}
 
         optimize_path(poses, _delta, opt_poses);
+    }
+    else {
+        std::cout<<"Il planner non ha trovato soluzione\n";
     }
 
     reset_planner();
