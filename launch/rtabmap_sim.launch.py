@@ -3,6 +3,9 @@
 #   Install realsense2 ros2 package (make sure you have this patch: https://github.com/IntelRealSense/realsense-ros/issues/2564#issuecomment-1336288238)
 # Example:
 #   $ ros2 launch rtabmap_examples realsense_d400.launch.py
+#          'qos_image': 2,
+#          'qos': 2,
+#
 
 import os
 

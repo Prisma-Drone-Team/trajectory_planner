@@ -13,6 +13,9 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_vehicle_command_publisher =
 		this->create_publisher<VehicleCommand>("fmu/in/vehicle_command", 10);
 
+	/*Visualization*/
+	_path_publisher =
+		this->create_publisher<nav_msgs::msg::Path>("rrt/path", 10);
 
 	rcl_interfaces::msg::ParameterDescriptor traj_points_descriptor;
 	traj_points_descriptor.description = "Trajectory points";
@@ -56,7 +59,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				}
 			});
 
-	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1)); 
+	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1));
 
 	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>("/octomap_binary", qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
 	_map_set = false;	
@@ -674,7 +677,10 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
     g.orientation.y = 0.0;
     g.orientation.z = 0.0;
 
-
+	geometry_msgs::msg::PoseStamped p;
+	nav_msgs::msg::Path generated_path;
+	generated_path.header.frame_id = "map";
+	
     // geometry_msgs::PoseStamped p;
     // p.header.frame_id = "drone/map";
 
@@ -683,10 +689,6 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 
     // nav_msgs::Path generated_path_opt;
     // generated_path_opt.header.frame_id = "drone/map";
-
-
-    // nav_msgs::Path generated_path;
-    // generated_path.header.frame_id = "drone/map";
 
     _pp->set_start_state(s);
     _pp->set_goal_state(g);
@@ -716,7 +718,7 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 
     xbounds[0] = _x_valid_min;
     ybounds[0] = _y_valid_min;
-    zbounds[0] = bz_min - _z_motion_threshold; //param?
+    zbounds[0] = bz_min - _z_motion_threshold; 
 
     xbounds[1] = _x_valid_max;
     ybounds[1] = _y_valid_max;
@@ -732,11 +734,27 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 				RCLCPP_ERROR(get_logger(),"Planner not correctly initialized"); 
 		else {
 
-			std::cout << "Solution (not optimal): " << std::endl;
+			for( int i=0; i<nav_poses.size(); i++ ) {
+				p.pose.position.x = nav_poses[i].position.x;
+				p.pose.position.y = nav_poses[i].position.y;
+				p.pose.position.z = nav_poses[i].position.z;
+
+				p.pose.orientation.x = nav_poses[i].orientation.x;
+				p.pose.orientation.y = nav_poses[i].orientation.y;
+				p.pose.orientation.z = nav_poses[i].orientation.y;
+				p.pose.orientation.w = nav_poses[i].orientation.z;
+
+				generated_path.poses.push_back( p );
+				std::cout<<i<<": p("<<p.pose.position.x<<", "<<p.pose.position.y<<", "<<p.pose.position.z<<")\n";
+
+			}
+			std::cout<<"Publish path\n";
+			_path_publisher->publish( generated_path );
+
+			std::cout << "Solution: " << std::endl;
 			
 			for(int i=0; i<nav_poses.size(); i++ ) {
 				std::cout << "Pose: [" << i << "]: " << "(" << nav_poses[i].position.x << " " << nav_poses[i].position.y << " " << nav_poses[i].position.z << ")" << std::endl;
-				
 			}
 		}
 	}
