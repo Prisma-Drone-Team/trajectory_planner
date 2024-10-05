@@ -18,6 +18,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
 	system 
 	thread 
@@ -64,7 +65,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs Boost tf2 tf2_ros)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs nav_msgs Boost tf2 tf2_ros)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 ############
@@ -72,7 +73,7 @@ install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 ############
 
 # Export information to downstream packages
-ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs fcl ompl)
+ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs nav_msgs fcl ompl)
 
 ament_export_targets(export_frame_transforms HAS_LIBRARY_TARGET)
 
