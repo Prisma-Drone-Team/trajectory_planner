@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#define START_FROM_LAST_MEAS 1
+#define START_FROM_LAST_MEAS 0
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
@@ -76,7 +76,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_max_velocity = this->get_parameter("max_velocity").as_double();
 	RCLCPP_INFO(get_logger(), "max_velocity: %f", _max_velocity);
 	
-	this->declare_parameter("robot_radius",0.1);
+	this->declare_parameter("robot_radius",0.8);
 	_robot_radius = this->get_parameter("robot_radius").as_double();
 	RCLCPP_INFO(get_logger(), "robot_radius: %f", _robot_radius);
 
@@ -237,7 +237,6 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 			yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
 			
-			//std::cout <<"DEBUG: " << sp(0) <<", " << sp(1) <<", " << sp(2) <<std::endl;
 
 			startTraj(_prev_sp, yaw_d, yaw_time); 
 			startTraj(sp, yaw_d, duration);
@@ -310,7 +309,7 @@ void OffboardControl::key_input() {
 			sp = _T_enu_to_ned*sp;
 
 			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-			
+			yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
 			yaw_time = 0.2 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
 			
@@ -336,6 +335,11 @@ void OffboardControl::key_input() {
 
 			int wp_index = 1;
 
+			auto id_wp_ptr = std::shared_ptr<int>(new int(0));
+
+			std::vector<POSE> poses_to_check = *opt_poses;
+			boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr);
+
 			while(wp_index<int(opt_poses->size()) && _plan_is_valid ){	
 				
 				sp(0) = (*opt_poses)[wp_index].position.x;
@@ -345,7 +349,7 @@ void OffboardControl::key_input() {
 				sp = _T_enu_to_ned*sp;
 
 				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-				
+				yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
 				yaw_time = 0.2 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 
 				duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
@@ -358,7 +362,10 @@ void OffboardControl::key_input() {
 			 	_prev_yaw_sp = yaw_d;
 
 				wp_index++;
+				*id_wp_ptr = wp_index;
 			}
+
+			//startWPTraj(opt_poses);
 
 
 		}
@@ -372,7 +379,7 @@ void OffboardControl::key_input() {
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
 			yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-			duration = 0.1 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+			duration = 0.1 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(_max_velocity);
 
 			this->arm();
 
@@ -380,7 +387,8 @@ void OffboardControl::key_input() {
 			startTraj(sp, yaw_d, duration);
 
 			_prev_sp = sp;
-			_prev_yaw_sp = yaw_d;                 
+			_prev_yaw_sp = yaw_d;    
+		
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
@@ -491,7 +499,6 @@ void OffboardControl::publish_trajectory_setpoint() {
 
 	matrix::Quaternionf des_att(_x.pose.orientation.w, _x.pose.orientation.x, _x.pose.orientation.y, _x.pose.orientation.z);
 	msg.yaw = matrix::Eulerf(des_att).psi();
-	msg.yawspeed = 0.0f;
 
 	if (isnanf(msg.position[0]) || isnanf(msg.position[1]) || isnanf(msg.position[2]))
 		RCLCPP_INFO(this->get_logger(),"NAN in trajectory setpoint");
@@ -518,7 +525,68 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	_vehicle_command_publisher->publish(msg);
 }
 
+void OffboardControl::startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses) {
 
+	matrix::Vector3f sp;
+	double duration;
+	double yaw_time;
+	float yaw_d;
+
+	std::vector<geometry_msgs::msg::PoseStamped> poses;
+	std::vector<double> times;
+	geometry_msgs::msg::PoseStamped p;
+	double t;
+
+	for(int i = 0; i<int(opt_poses->size()); i++) {
+		sp(0) = (*opt_poses)[i].position.x;
+		sp(1) = (*opt_poses)[i].position.y;
+		sp(2) = (*opt_poses)[i].position.z; 
+		
+		sp = _T_enu_to_ned*sp;
+
+		yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+		yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
+		matrix::Quaternionf att(matrix::Eulerf(0, 0, yaw_d));
+
+		yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+		duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+		p.pose.position.x = _prev_sp(0);
+		p.pose.position.y = _prev_sp(1);
+		p.pose.position.z = _prev_sp(2); 
+
+		p.pose.orientation.w = _prev_att_sp(0);
+		p.pose.orientation.x = _prev_att_sp(1);
+		p.pose.orientation.y = _prev_att_sp(2);
+		p.pose.orientation.z = _prev_att_sp(3);
+
+		t = 0.0f;
+		
+		poses.push_back(p);
+		times.push_back(t);
+		
+		/* */
+		p.pose.position.x = sp(0);
+		p.pose.position.y = sp(1);
+		p.pose.position.z = sp(2); 
+
+		p.pose.orientation.w = att(0);
+		p.pose.orientation.x = att(1);
+		p.pose.orientation.y = att(2);
+		p.pose.orientation.z = att(3);
+
+
+		_prev_sp = sp;
+		_prev_att_sp = att;
+
+		poses.push_back(p);
+		times.push_back(duration);
+
+	}
+	_trajectory.set_waypoints(poses, times);
+
+	_trajectory.compute();
+}
 
 void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 
@@ -674,7 +742,7 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	}
 }
 
-void OffboardControl::check_path( const std::vector<POSE> & poses, const std::shared_ptr<int> wp ) {
+void OffboardControl::check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp) {
     
     // Eigen::Vector3d dir;
     // Eigen::Vector3d v0;
@@ -745,6 +813,54 @@ void OffboardControl::check_path( const std::vector<POSE> & poses, const std::sh
 	// 	RCLCPP_WARN(rclcpp::get_logger("OFFBOARD"), "New obstacle detected! Replan");
     //     _replan = true;
     // }
+
+	Eigen::Vector3d pt_check;
+	Eigen::Vector3d dir;
+	Eigen::Vector3d pt_i;
+	Eigen::Vector3d pt_f;
+	bool valid_path = true;
+	double s[3]; //state
+	double step = 0.2;
+	bool segment_checked = false;
+
+	while( valid_path && !_stop_trajectory && *wp < poses.size()){
+
+		if(*wp != 0){
+
+			pt_i << _position(0), _position(1), _position(2);
+
+			for(int i=*wp + 1; i<poses.size(); i++ ) {
+
+				pt_f << poses[i].position.x, poses[i].position.y, poses[i].position.z;
+				
+				dir = (pt_f - pt_i);
+				if (dir.norm() > 0.0) dir /= dir.norm();
+				segment_checked = false;
+
+    	        while( !segment_checked && valid_path) {
+
+					pt_check += dir*step;
+
+					s[0] = pt_check[0];
+					s[1] = pt_check[1];
+					s[2] = pt_check[2];
+
+					valid_path = _pp->check_state(s);
+
+					segment_checked = ((pt_check-pt_f).norm() < step);
+
+				}
+				pt_i = pt_f;
+
+				if(!valid_path) break;
+			}
+		}
+	}
+	if( !valid_path ) {
+		RCLCPP_WARN(get_logger(), "New obstacle detected! Replan");
+		_replan = true;
+		_first_traj = false;
+	}
 }   
 
 
