@@ -118,18 +118,20 @@ private:
 	void timer_callback();
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
+	void check_path( const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
+	
 
 	bool _first_odom{false};
 	bool _first_traj{false};
 
 	rclcpp::TimerBase::SharedPtr _timer;
+	rclcpp::TimerBase::SharedPtr _check_timer;
 	milliseconds _timer_period{10ms};
+	
 	float _timer_freq{100.0f};
 
 	CARTESIAN_PLANNER _trajectory{_timer_freq};
-
-
-	void takeoffTraj(float alt);
+	void holdTraj();
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
 	void plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
@@ -178,7 +180,8 @@ private:
 	matrix::Vector3f _goal{};
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
-	matrix::Vector3f _prev_sp;
+	matrix::Vector3f _prev_sp{};
+	matrix::Quaternionf _prev_att_sp{};
 	float _prev_yaw_sp;
 
 	geometry_msgs::msg::PoseStamped _x;
@@ -197,4 +200,6 @@ private:
 	bool _map_set, _replan;
 	double _use_octomap, _rviz_output, _dist_from_th_error;
 	int _replan_cnt;
+
+	bool _stop_trajectory{false}, _plan_is_valid{true};
 };
