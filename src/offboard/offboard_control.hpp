@@ -117,6 +117,7 @@ public:
 private:
 	void timer_callback();
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
+	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 
 	bool _first_odom{false};
 	bool _first_traj{false};
@@ -126,9 +127,8 @@ private:
 	float _timer_freq{100.0f};
 
 	CARTESIAN_PLANNER _trajectory{_timer_freq};
-	//CARTESIAN_PLANNER _tmp_trajectory{_timer_freq};
 
-	//void firstTraj();
+
 	void takeoffTraj(float alt);
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 
@@ -140,7 +140,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
-	// rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr octomap_sub_;
+	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
