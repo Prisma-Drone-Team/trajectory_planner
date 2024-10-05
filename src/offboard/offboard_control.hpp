@@ -74,7 +74,7 @@
 #include "planner_spline.h"
 
 #include "planner.h" 
-
+#include <nav_msgs/msg/path.hpp>
 #include <octomap/octomap.h>
 #include "octomap_msgs/conversions.h"
 #include <octomap_msgs/msg/octomap.hpp>
@@ -138,6 +138,7 @@ private:
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
+	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
