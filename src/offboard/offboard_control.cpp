@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#define START_FROM_LAST_POSE 1
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
@@ -57,19 +58,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 
 	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1)); 
 
-		
-		// octomap_sub_ = this->create_subscription<octomap_msgs::msg::Octomap>(
-		// "/rtabmap/octomap_binary", qos,
-		// [this](const octomap_msgs::msg::Octomap::UniquePtr msg) {
-		// 	octomap::AbstractOcTree* tree = octomap_msgs::fullMsgToMap(*msg);  // Use the appropriate conversion function
-		// 	octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(tree);
-		// 	if (octree) {
-		// 		_pp->set_octo_tree(octree);
-		// 		_map_set = true;
-		// 	} else {
-		// 		RCLCPP_WARN(this->get_logger(), "Failed to cast AbstractOcTree to OcTree");
-		// 	}
-		// });	
+	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>("/octomap_binary", qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
+	_map_set = false;	
 
 	_offboard_setpoint_counter = 0;
 
@@ -156,12 +146,19 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_map_set = false;
 }
 
+void OffboardControl::octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg ) {
+	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*octo_msg);
+    octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
+	_pp->set_octo_tree(tree_oct);
+	_map_set = true;
+	RCLCPP_INFO(get_logger(), "Map got");
+}
+
 void OffboardControl::timer_callback() {
 	if(!_first_odom)
 		return;
 
 	if(!_first_traj){
-		//firstTraj();
 		_last_pos_sp = _position;
 		_last_att_sp = _attitude;
 		startTraj(_position, matrix::Eulerf(_attitude).psi(), 0.1);
@@ -468,8 +465,6 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	msg.source_system = 1;
 	msg.source_component = 1;
 	msg.from_external = true;
-	
-	//std::cout << "Sending command\n";
 
 	_vehicle_command_publisher->publish(msg);
 }
@@ -507,38 +502,9 @@ void OffboardControl::takeoffTraj(float alt) {
 
 	_trajectory.set_waypoints(poses, times);
 	_trajectory.compute();
-	//std::cout << "Takeoff trajectory set\n";
+
 }
 
-// void OffboardControl::firstTraj() {
-// 	std::vector<geometry_msgs::msg::PoseStamped> poses;
-// 	std::vector<double> times;
-// 	geometry_msgs::msg::PoseStamped p;
-// 	double t;
-
-// 	_last_pos_sp = _position;
-// 	_last_att_sp = _attitude;
-
-// 	p.pose.position.x = _last_pos_sp(0);
-// 	p.pose.position.y = _last_pos_sp(1);
-// 	p.pose.position.z = _last_pos_sp(2); 
-
-// 	p.pose.orientation.w = _last_att_sp(0);
-// 	p.pose.orientation.x = _last_att_sp(1);
-// 	p.pose.orientation.y = _last_att_sp(2);
-// 	p.pose.orientation.z = _last_att_sp(3);
-// 	t = 0.0f;
-
-// 	poses.push_back(p);
-// 	times.push_back(t);
-	
-// 	poses.push_back(p);
-// 	times.push_back(0.1);
-
-// 	_trajectory.set_waypoints(poses, times);
-// 	_trajectory.compute();
-
-// }
 
 void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 
@@ -551,10 +517,13 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	geometry_msgs::msg::PoseStamped p;
 	double t;
 
-	// if(pos(2) > 0.0f)
-	//     pos(2) *= -1;
-
 	matrix::Quaternionf att(matrix::Eulerf(0, 0, yaw));
+
+	if(START_FROM_LAST_POSE){
+		_last_pos_sp = _position;
+		_last_att_sp = _attitude;
+	}
+
 
 	/* */
 	p.pose.position.x = _last_pos_sp(0);
@@ -581,26 +550,18 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	p.pose.orientation.y = att(2);
 	p.pose.orientation.z = att(3);
 
-	t = d;
 
 	_last_pos_sp = pos;
 	_last_att_sp = att;
 
 	poses.push_back(p);
-	times.push_back(t);
+	times.push_back(d);
 
-	// auto start = steady_clock::now();
 
 	_trajectory.set_waypoints(poses, times);
 
 	_trajectory.compute();
 
-	// while(_trajectory.isReady()) {
-	// 	usleep(0.1e6);
-	// }
-	// _trajectory = _tmp_trajectory;
-	
-	// auto end = steady_clock::now();
 }
 
 void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
