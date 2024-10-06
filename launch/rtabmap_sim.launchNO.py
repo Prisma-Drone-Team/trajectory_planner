@@ -22,6 +22,10 @@ def generate_launch_description():
           'map_frame_id':'map',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
+          'visual_odometry': False,
+          'odom_frame_id':'fake_odom',
+          'qos_image': 2,
+          'qos': 2,
           'approx_sync':True}]
 
     remappings=[
