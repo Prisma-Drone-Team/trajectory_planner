@@ -22,7 +22,9 @@ def generate_launch_description():
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['0', '0', ' 0', '0', '0', '3.14159265359', 'base_link_FRD', 'base_link']),  # ZYX
-
+        Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['0', '0', ' 0', '-1.5707963', '-3.1415927',  '0', 'fake_odom', 'odomNED']),  # ZYX
         # Realsense camera
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
@@ -31,4 +33,3 @@ def generate_launch_description():
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
         #     arguments=['0.15', '0.03', ' 0.202', '0', '0', '0', 'base_link', '/x500_depth_0/camera_link/color']),
     ])
-

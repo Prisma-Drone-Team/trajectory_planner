@@ -23,6 +23,9 @@ def generate_launch_description():
           'subscribe_depth':True,
           'subscribe_odom_info':True,
           'visual_odometry': False,
+          'odom_frame_id':'fake_odom',
+          'qos_image': 2,
+          'qos': 2,
           'approx_sync':True}]
 
     remappings=[
@@ -30,7 +33,8 @@ def generate_launch_description():
           ('/odom', '/odom'),
           ('rgb/camera_info', '/camera_info'),
           ('depth/image','/depth_camera')]
-
+    
+    
     return LaunchDescription([
 
         # Make sure IR emitter is enabled
@@ -44,6 +48,7 @@ def generate_launch_description():
         #         launch_arguments={'align_depth.enable': 'true',
         #                           'rgb_camera.profile': '640x360x30'}.items(),
         # ),
+  
 
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',

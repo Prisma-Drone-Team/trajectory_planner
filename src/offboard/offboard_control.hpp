@@ -45,14 +45,17 @@
 
 #pragma once
 
-// #include <px4_msgs/msg/tilting_attitude_setpoint.hpp>
+// #include <px4_msgs/msg/vehicle_odometry.hpp>
+// #include <px4_msgs/msg/offboard_control_mode.hpp>
+// #include <px4_msgs/msg/trajectory_setpoint.hpp>
+// #include <px4_msgs/msg/timesync_status.hpp>
+// #include <px4_msgs/msg/vehicle_command.hpp>
+// #include <px4_msgs/msg/vehicle_control_mode.hpp>
 
-#include <px4_msgs/msg/vehicle_odometry.hpp>
-#include <px4_msgs/msg/offboard_control_mode.hpp>
-#include <px4_msgs/msg/trajectory_setpoint.hpp>
-#include <px4_msgs/msg/timesync_status.hpp>
-#include <px4_msgs/msg/vehicle_command.hpp>
-#include <px4_msgs/msg/vehicle_control_mode.hpp>
+#include <mavros_msgs/srv/command_long.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <mavros_msgs/msg/position_target.hpp>
+
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -84,7 +87,7 @@
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
-using namespace px4_msgs::msg;
+
 
 enum NodeState {
 	STOPPED = 0,
@@ -100,27 +103,27 @@ public:
 	/**
 	 * @brief Send a command to Arm the vehicle
 	 */
-	void arm();
-	/**
-	 * @brief Send a command to Disarm the vehicle
-	 */
-	void disarm();
+	void arm(bool arm);
+
 
 	void setState(NodeState state) {_state = state;}
 
 	void key_input();
 
+	void flight_termination(bool val);
 
-	void flight_termination(float val);
-
+	void send_command(const std::shared_ptr<mavros_msgs::srv::CommandLong::Request> &request, const std::string &command_name);
 
 private:
+
 	void timer_callback();
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 	void check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
+
+	void mavros_pose_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 	
-	bool _first_odom{false};
+	bool _first_pose{false};
 	bool _first_traj{false};
 
 	rclcpp::TimerBase::SharedPtr _timer;
@@ -130,19 +133,20 @@ private:
 	float _timer_freq{100.0f};
 
 	CARTESIAN_PLANNER _trajectory{_timer_freq};
+
 	void holdTraj();
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 	void startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses);
 	void plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
-	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
-	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
-	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
+	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _local_pose_sub;
+    rclcpp::Publisher<mavros_msgs::msg::PositionTarget>::SharedPtr _setpoint_pub;
+
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
-	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
-	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
+
+	rclcpp::Client<mavros_msgs::srv::CommandLong>::SharedPtr _command_client;
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -176,7 +180,7 @@ private:
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
 
 	NodeState _state;
-	TrajectorySetpoint _current_setpoint_msg;
+
 	matrix::Vector3f _goal{};
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
@@ -196,7 +200,6 @@ private:
 
 	double _max_yaw_rate, _max_velocity;
 
-	matrix::Matrix3f _T_enu_to_ned;
 	bool _map_set, _replan;
 	double _use_octomap, _rviz_output, _dist_from_th_error;
 	int _replan_cnt;

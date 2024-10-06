@@ -6,16 +6,9 @@
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
-	_offboard_control_mode_publisher =
-		this->create_publisher<OffboardControlMode>("fmu/in/offboard_control_mode", 10);
-	_trajectory_setpoint_publisher =
-		this->create_publisher<TrajectorySetpoint>("fmu/in/trajectory_setpoint", 10);
-	_vehicle_command_publisher =
-		this->create_publisher<VehicleCommand>("fmu/in/vehicle_command", 10);
 
 	/*Visualization*/
-	_path_publisher =
-		this->create_publisher<nav_msgs::msg::Path>("rrt/path", 10);
+	_path_publisher = this->create_publisher<nav_msgs::msg::Path>("rrt/path", 10);
 
 	rcl_interfaces::msg::ParameterDescriptor traj_points_descriptor;
 	traj_points_descriptor.description = "Trajectory points";
@@ -32,32 +25,12 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 	auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
-	// get common timestamp
-	_timesync_sub =
-		this->create_subscription<px4_msgs::msg::TimesyncStatus>("/fmu/out/timesync_status", qos,
-			[this](const px4_msgs::msg::TimesyncStatus::UniquePtr msg) {
-				_timestamp.store(msg->timestamp);
-			});
+	_command_client = this->create_client<mavros_msgs::srv::CommandLong>("/mavros/cmd/command");
 
-	_odom_sub =
-		this->create_subscription<px4_msgs::msg::VehicleOdometry>("fmu/out/vehicle_odometry", qos,
-			[this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
-				_first_odom = true;
-				
-				_attitude = matrix::Quaternionf(msg->q.data()[0], msg->q.data()[1], msg->q.data()[2], msg->q.data()[3]);
-				_position = matrix::Vector3f(msg->position[0], msg->position[1], msg->position[2]);
-				if(isnanf(_position(0)) || 
-						isnanf(_position(1)) ||
-						isnanf(_position(2))) {
-					RCLCPP_WARN(rclcpp::get_logger("OFFBOARD"), "INVALID POSITION: %10.5f, %10.5f, %10.5f",
-						_position(0), _position(1), _position(2));
-				}
-				if(!_first_traj){
-					_prev_sp = _position;
-					_prev_att_sp = _attitude;
-					_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
-				}
-			});
+	_setpoint_pub = this->create_publisher<mavros_msgs::msg::PositionTarget>( "/mavros/setpoint_raw/local", 10);
+
+	_local_pose_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>( "/mavros/local_position/pose", qos, std::bind(&OffboardControl::mavros_pose_cb, this, std::placeholders::_1));
+
 
 	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1));
 
@@ -138,14 +111,29 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
-    
-	_T_enu_to_ned.setZero();
-	_T_enu_to_ned(0,1) =  1.0;
-	_T_enu_to_ned(1,0) =  1.0;
-	_T_enu_to_ned(2,2) = -1.0;
+
 
 }
 
+void OffboardControl::mavros_pose_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
+
+	_first_pose = true;
+				
+	_attitude = matrix::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
+	_position = matrix::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+
+	if(isnanf(_position(0)) || 
+			isnanf(_position(1)) ||
+			isnanf(_position(2))) {
+		RCLCPP_WARN(rclcpp::get_logger("OFFBOARD"), "INVALID POSITION: %10.5f, %10.5f, %10.5f",
+			_position(0), _position(1), _position(2));
+	}
+	if(!_first_traj){
+		_prev_sp = _position;
+		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+	}
+
+}
 void OffboardControl::octomap_callback(const octomap_msgs::msg::Octomap::SharedPtr octo_msg ) {
 	octomap::AbstractOcTree* tect = octomap_msgs::binaryMsgToMap(*octo_msg);
     octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
@@ -155,7 +143,7 @@ void OffboardControl::octomap_callback(const octomap_msgs::msg::Octomap::SharedP
 }
 
 void OffboardControl::timer_callback() {
-	if(!_first_odom)
+	if(!_first_pose)
 		return;
 
 	if(!_first_traj){
@@ -168,7 +156,7 @@ void OffboardControl::timer_callback() {
 	}
 
 	if (_offboard_setpoint_counter == 10) {
-		this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+		publish_offboard_control_mode();
 	}
 
 
@@ -199,8 +187,6 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 
 	if(cmd == "go") {
 	
-		sp = _T_enu_to_ned*sp;
-
 		yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 		
 		yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
@@ -232,8 +218,7 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 			sp(0) = (*opt_poses)[i].position.x;
 			sp(1) = (*opt_poses)[i].position.y;
 			sp(2) = (*opt_poses)[i].position.z; 
-			
-			sp = _T_enu_to_ned*sp;
+
 
 			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 			yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
@@ -258,14 +243,12 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 		sp(0) = _position(1);   
 		sp(1) = _position(0);
 		
-		
-		sp = _T_enu_to_ned*sp;
 		yaw_d = matrix::Eulerf(_attitude).psi(); 
 		
 		yaw_time = std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 		duration = std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(2*_max_velocity);
 
-		this->arm();
+		this->arm(true);
 
 		//startTraj(_prev_sp, yaw_d, yaw_time); 
 		startTraj(sp, yaw_d, duration);
@@ -274,17 +257,17 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 		_prev_yaw_sp = yaw_d;                 
 	}
 	else if(cmd == "land") {
-		_prev_sp(2) = 0.5; 
+		_prev_sp(2) = -0.5; 
 		//yaw_d = matrix::Eulerf(_attitude).psi();
 		startTraj(_prev_sp, yaw_d, 15);	 // TODO tune time
 	}
 	else if(cmd == "arm") {
 		_first_traj = false;
-		this->flight_termination(0);
-		this->arm();
+		this->flight_termination(false);
+		this->arm(true);
 	}
 	else if(cmd == "term") {
-		this->flight_termination(1);		 // TODO unire term a land (check odometry feedback)
+		this->flight_termination(true);		 // TODO unire term a land (check odometry feedback)
 	}
 
 }
@@ -308,8 +291,7 @@ void OffboardControl::key_input() {
 			std::cin >> sp(1);
 			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> sp(2);
-			
-			sp = _T_enu_to_ned*sp;
+
 
 			yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 			yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
@@ -348,8 +330,6 @@ void OffboardControl::key_input() {
 				sp(0) = (*opt_poses)[wp_index].position.x;
 				sp(1) = (*opt_poses)[wp_index].position.y;
 				sp(2) = (*opt_poses)[wp_index].position.z;    // TODO proper conversion
-				
-				sp = _T_enu_to_ned*sp;
 
 				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 				yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
@@ -378,13 +358,13 @@ void OffboardControl::key_input() {
 			std::cout << "Enter takeoff altitude (ENU frame): "; 
 			std::cin >> sp(2);
 			
-			sp = _T_enu_to_ned*sp;
+
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
 			yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
 			duration = 0.1 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(_max_velocity);
 
-			this->arm();
+			this->arm(1);
 
 			//startTraj(_prev_sp, yaw_d, yaw_time); 
 			startTraj(sp, yaw_d, duration);
@@ -401,7 +381,7 @@ void OffboardControl::key_input() {
 		else if(cmd == "arm") {
 			_first_traj = false;
 			this->flight_termination(0);
-			this->arm();
+			this->arm(1);
 		}
 		else if(cmd == "term") {
 			this->flight_termination(1);		 // TODO unire term a land (check odometry feedback)
@@ -447,85 +427,98 @@ void OffboardControl::holdTraj() {
 	_trajectory.compute();
 
 }
+void OffboardControl::send_command(const std::shared_ptr<mavros_msgs::srv::CommandLong::Request> &request, const std::string &command_name){
+	// Wait for the service to be available
+	// while (!_command_client->wait_for_service(std::chrono::seconds(1)))
+	// {
+	// 	RCLCPP_WARN(this->get_logger(), "Waiting for CommandLong service to be available...");
+	// }
 
-void OffboardControl::arm() {
-	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
+	// Call the service
+	auto result = _command_client->async_send_request(request);
+	// result.wait();
 
+	// // Check if the command was successful
+	// if (result.get()->success)
+	// {
+	// 	RCLCPP_INFO(this->get_logger(), "%s command sent successfully!", command_name.c_str());
+	// }
+	// else
+	// {
+	// 	RCLCPP_ERROR(this->get_logger(), "Failed to send %s command.", command_name.c_str());
+	// }
+}
+void OffboardControl::arm(bool arm){
+
+	auto request = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+	request->command = 400;  // MAV_CMD_COMPONENT_ARM_DISARM
+	request->param1 = arm ? 1 : 0;  // 1 to arm, 0 to disarm
+	request->broadcast = false;
+
+	// Send the command
 	RCLCPP_INFO(this->get_logger(), "Arm command send");
+	this->send_command(request, arm ? "Arm" : "Disarm");
+;
 }
 
-void OffboardControl::disarm() {
-	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
-
-	RCLCPP_INFO(this->get_logger(), "Disarm command send");
-}
-
-void OffboardControl::flight_termination(float value){
-	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_FLIGHTTERMINATION, value);
+void OffboardControl::flight_termination(bool terminate){
+	auto request = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+	request->command = 185;  // MAV_CMD_DO_FLIGHTTERMINATION
+	request->param1 = terminate ? 1 : 0;  // 1 to terminate, 0 to cancel
+	request->broadcast = false;
+	this->send_command(request, terminate ? "Flight Termination: Active" : "Flight Termination: Unactive");
 
 	RCLCPP_INFO(this->get_logger(), "Flight Termination command send");
 }
 
-void OffboardControl::publish_offboard_control_mode() {
-	OffboardControlMode msg{};
-	rclcpp::Time now = this->get_clock()->now();
+void OffboardControl::publish_offboard_control_mode(){
+	auto request = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+	request->command = 176;  // MAV_CMD_DO_SET_MODE
+	request->param1 = 1;     // Base mode (custom)
+	request->param2 = 6;     // Custom mode (6 = Offboard mode)
+	request->broadcast = false;
 
-	msg.timestamp = now.nanoseconds() / 1000.0;
-
-	msg.position = true;
-	msg.velocity = true;
-	msg.acceleration = true;
-	msg.attitude = true;
-	msg.body_rate = false;
-
-	_offboard_control_mode_publisher->publish(msg);
+	// Send the command
+	this->send_command(request, "Offboard Mode");
 }
 
-void OffboardControl::publish_trajectory_setpoint() {
-	TrajectorySetpoint msg{};
-	rclcpp::Time now = this->get_clock()->now();
+void OffboardControl::publish_trajectory_setpoint(){
 
-	msg.timestamp = now.nanoseconds() / 1000.0;
+	auto setpoint_msg = mavros_msgs::msg::PositionTarget();
 
+	// Set the coordinate frame 
+	setpoint_msg.coordinate_frame = mavros_msgs::msg::PositionTarget::FRAME_LOCAL_NED;
+	setpoint_msg.header.stamp = this->get_clock()->now();
 
-	msg.position[0] = _x.pose.position.x;
-	msg.position[1] = _x.pose.position.y;
-	msg.position[2] = _x.pose.position.z;
+	// Remove the type mask for the fields we want to publish (e.g., position, velocity, acceleration, and yaw)
+	// setpoint_msg.type_mask = mavros_msgs::msg::PositionTarget::IGNORE_PX |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_PY |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_PZ |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_VX |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_VY |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_VZ |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_AFX |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_AFY |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_AFZ |
+	// 							mavros_msgs::msg::PositionTarget::IGNORE_YAW_RATE;
 
-	msg.velocity[0] = _xd.twist.linear.x;
-	msg.velocity[1] = _xd.twist.linear.y;
-	msg.velocity[2] = _xd.twist.linear.z;
+	setpoint_msg.position.x = _x.pose.position.x;
+	setpoint_msg.position.y = _x.pose.position.y;
+	setpoint_msg.position.z = _x.pose.position.z;
 
-	msg.acceleration[0] = _xdd.accel.linear.x;
-	msg.acceleration[1] = _xdd.accel.linear.y;
-	msg.acceleration[2] = _xdd.accel.linear.z;
+	setpoint_msg.velocity.x = _xd.twist.linear.x;  
+	setpoint_msg.velocity.y = _xd.twist.linear.y;  
+	setpoint_msg.velocity.z = _xd.twist.linear.z; 
+
+	setpoint_msg.acceleration_or_force.x = _xdd.accel.linear.x;
+	setpoint_msg.acceleration_or_force.y = _xdd.accel.linear.y; 
+	setpoint_msg.acceleration_or_force.z = _xdd.accel.linear.z; 
 
 	matrix::Quaternionf des_att(_x.pose.orientation.w, _x.pose.orientation.x, _x.pose.orientation.y, _x.pose.orientation.z);
-	msg.yaw = matrix::Eulerf(des_att).psi();
-
-	if (isnanf(msg.position[0]) || isnanf(msg.position[1]) || isnanf(msg.position[2]))
-		RCLCPP_INFO(this->get_logger(),"NAN in trajectory setpoint");
-
-	_trajectory_setpoint_publisher->publish(msg);
-}
-
-void OffboardControl::publish_vehicle_command(uint16_t command, float param1, float param2) {
-	VehicleCommand msg{};
-	rclcpp::Time now = this->get_clock()->now();
-
-	msg.timestamp = now.nanoseconds() / 1000.0;
-
-	msg.param1 = param1;
-	msg.param2 = param2;
-
-	msg.command = command;
-	msg.target_system = 1;
-	msg.target_component = 1;
-	msg.source_system = 1;
-	msg.source_component = 1;
-	msg.from_external = true;
-
-	_vehicle_command_publisher->publish(msg);
+	setpoint_msg.yaw = matrix::Eulerf(des_att).psi();;  
+	setpoint_msg.yaw_rate = 0.0f;
+	
+	_setpoint_pub->publish(setpoint_msg);
 }
 
 void OffboardControl::startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses) {
@@ -544,8 +537,6 @@ void OffboardControl::startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses) 
 		sp(0) = (*opt_poses)[i].position.x;
 		sp(1) = (*opt_poses)[i].position.y;
 		sp(2) = (*opt_poses)[i].position.z; 
-		
-		sp = _T_enu_to_ned*sp;
 
 		yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
 		yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
@@ -659,11 +650,10 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
     POSE s;
     POSE g;
     
-	matrix::Vector3f prev_sp = _T_enu_to_ned*_prev_sp; 
-	//matrix::Vector3f prev_sp = _T_enu_to_ned*_last_pos_sp;
-    s.position.x = prev_sp(0); 
-    s.position.y = prev_sp(1);
-    s.position.z = prev_sp(2);
+
+    s.position.x = _prev_sp(0); 
+    s.position.y = _prev_sp(1);
+    s.position.z = _prev_sp(2);
     s.orientation.w = 1.0; // _last_att_sp(0); 
     s.orientation.x = 0.0; // _last_att_sp(1);
     s.orientation.y = 0.0; // _last_att_sp(2);
