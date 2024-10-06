@@ -151,7 +151,7 @@ void OffboardControl::octomap_callback(const octomap_msgs::msg::Octomap::SharedP
     octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
 	_pp->set_octo_tree(tree_oct);
 	_map_set = true;
-	RCLCPP_INFO(get_logger(), "Map got");
+	//RCLCPP_INFO(get_logger(), "Map got");
 }
 
 void OffboardControl::timer_callback() {
