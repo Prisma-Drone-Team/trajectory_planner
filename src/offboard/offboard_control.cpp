@@ -339,6 +339,7 @@ void OffboardControl::key_input() {
 
 			auto opt_poses = std::make_shared<std::vector<POSE>>();
 			plan(wp,opt_poses);
+			
 			_replan = false;
 
 			int wp_index = 1;
@@ -374,12 +375,12 @@ void OffboardControl::key_input() {
 				*id_wp_ptr = wp_index;
 				wp_index++;
 
-				if (_stop_trajectory || _replan) {
-					//holdTraj();
-					// std::cout << "Replanning...\n";
-					// plan(wp,opt_poses);
-					// _replan = false;
-				}
+				// if (_stop_trajectory || _replan) {
+				// 	//holdTraj();
+				// 	// std::cout << "Replanning...\n";
+				// 	// plan(wp,opt_poses);
+				// 	// _replan = false;
+				// }
 			}
 
 			// while(_trajectory.isReady()){
@@ -890,7 +891,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	bool segment_checked = false;
 	bool trajetory_is_completed = false;
 	bool is_last_sp = false;
-	//while( valid_path && !_stop_trajectory && *wp < poses.size()){
+
 	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
 
 		if(*wp != 0){
