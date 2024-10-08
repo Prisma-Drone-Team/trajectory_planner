@@ -168,7 +168,7 @@ class MoveManager : public rclcpp::Node
             geometry_msgs::msg::TransformStamped t;
 
             t.header.stamp = this->get_clock()->now();
-            t.header.frame_id = "fake_odom";
+            t.header.frame_id = "odom";
             t.child_frame_id = "odomNED";
 
             t.transform.translation.x = 0.0;

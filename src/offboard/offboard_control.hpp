@@ -79,6 +79,7 @@
 #include "octomap_msgs/conversions.h"
 #include <octomap_msgs/msg/octomap.hpp>
 #include <octomap/AbstractOcTree.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "trajectory_planner/msg/move_cmd.hpp"
 
@@ -139,6 +140,8 @@ private:
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
+	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _check_path_pub;
+
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
@@ -201,6 +204,6 @@ private:
 	double _use_octomap, _rviz_output, _dist_from_th_error;
 	int _replan_cnt;
 
-	bool _stop_trajectory{false}, _plan_is_valid{true};
+	bool _stop_trajectory{false}, _plan_is_valid{true}, _wp_traj_completed{false};
 
 };
