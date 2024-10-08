@@ -1,0 +1,25 @@
+session_name: simulation
+socket_name: drone
+environment:
+pre_window: 
+windows:
+- window_name: drone
+  layout: tiled
+  panes:
+    - shell_command:
+        - sleep 25
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 launch trajectory_planner tf_static_sim.launch.py
+    - shell_command:
+        - sleep 25
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 launch trajectory_planner rtabmap.launch.py
+    - shell_command:
+        - sleep 25
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 launch mavros px4.launch fcu_url:=/dev/ttyACM0:57600
+    - shell_command:
+        - cd ~/ros2_ws && source install/setup.bash
+    - shell_command:
+        - cd ~/ros2_ws && source install/setup.bash
+        
