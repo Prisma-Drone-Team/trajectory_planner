@@ -20,6 +20,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
 	system 
 	thread 
@@ -55,7 +56,7 @@ target_include_directories(frame_transforms PUBLIC
 
 # /offboard_control
 add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/spline/planner_spline.cpp src/offboard/planner/planner.cpp)
-ament_target_dependencies(offboard_control rclcpp mavros_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl octomap octomap_msgs nav_msgs)
+ament_target_dependencies(offboard_control rclcpp mavros_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl octomap octomap_msgs nav_msgs visualization_msgs)
 target_include_directories(offboard_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
@@ -66,7 +67,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs mavros_msgs nav_msgs px4_msgs Boost tf2 tf2_ros)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs mavros_msgs nav_msgs visualization_msgs px4_msgs Boost tf2 tf2_ros)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 ############

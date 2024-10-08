@@ -82,6 +82,7 @@
 #include "octomap_msgs/conversions.h"
 #include <octomap_msgs/msg/octomap.hpp>
 #include <octomap/AbstractOcTree.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "trajectory_planner/msg/move_cmd.hpp"
 
@@ -141,7 +142,7 @@ private:
 
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _local_pose_sub;
     rclcpp::Publisher<mavros_msgs::msg::PositionTarget>::SharedPtr _setpoint_pub;
-
+	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _check_path_pub;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
@@ -180,11 +181,11 @@ private:
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
 
 	NodeState _state;
-
 	matrix::Vector3f _goal{};
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
 	matrix::Vector3f _prev_sp{};
+	matrix::Vector3f _stop_sp{};
 	matrix::Quaternionf _prev_att_sp{};
 	float _prev_yaw_sp;
 
@@ -204,6 +205,5 @@ private:
 	double _use_octomap, _rviz_output, _dist_from_th_error;
 	int _replan_cnt;
 
-	bool _stop_trajectory{false}, _plan_is_valid{true};
-
+	bool _stop_trajectory{false}, _plan_is_valid{true}, _wp_traj_completed{false};
 };
