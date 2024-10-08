@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#define START_FROM_LAST_MEAS 0
+#define START_FROM_LAST_MEAS 1
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
@@ -14,8 +14,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 		this->create_publisher<VehicleCommand>("fmu/in/vehicle_command", 10);
 
 	/*Visualization*/
-	_path_publisher =
-		this->create_publisher<nav_msgs::msg::Path>("rrt/path", 10);
+	_path_publisher = this->create_publisher<nav_msgs::msg::Path>("rrt/path", 1);
+	_check_path_pub = this->create_publisher<visualization_msgs::msg::Marker>("/leo/drone/check_path", 1);
 
 	rcl_interfaces::msg::ParameterDescriptor traj_points_descriptor;
 	traj_points_descriptor.description = "Trajectory points";
@@ -165,14 +165,15 @@ void OffboardControl::timer_callback() {
 		//_first_traj = true;
 		holdTraj();
 		_first_traj = true;
+		_stop_trajectory = false;
 	}
 
 	if (_offboard_setpoint_counter == 10) {
 		this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
 
-
-	_trajectory.getNext(_x, _xd, _xdd);
+	if(!_stop_trajectory)
+		_trajectory.getNext(_x, _xd, _xdd);
 	
 	// offboard_control_mode needs to be paired with trajectory_setpoint
 	publish_offboard_control_mode();
@@ -325,25 +326,30 @@ void OffboardControl::key_input() {
 		}
 		else if(cmd=="nav"){
 			Eigen::Vector3d wp;
-	
+			//_wp_traj_completed = true; // Otherwise the last check thread keeps running - the new nav overrides the previous
 			std::cout << "Enter X coordinate (ENU frame): "; 
 			std::cin >> wp[0];
 			std::cout << "Enter Y coordinate (ENU frame): "; 
 			std::cin >> wp[1];
 			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> wp[2];
-			
+
+			_replan = true;
+			_wp_traj_completed = false;
+
 			auto opt_poses = std::make_shared<std::vector<POSE>>();
 			plan(wp,opt_poses);
+			_replan = false;
 
 			int wp_index = 1;
 
 			auto id_wp_ptr = std::shared_ptr<int>(new int(0));
+			//*id_wp_ptr = wp_index;
 
 			std::vector<POSE> poses_to_check = *opt_poses;
 			boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr);
 
-			while(wp_index<int(opt_poses->size()) && _plan_is_valid ){	
+			while(wp_index<int(opt_poses->size()) && _stop_trajectory == false) {	
 				
 				sp(0) = (*opt_poses)[wp_index].position.x;
 				sp(1) = (*opt_poses)[wp_index].position.y;
@@ -358,18 +364,28 @@ void OffboardControl::key_input() {
 				duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
 
 		
-				startTraj(_prev_sp, yaw_d, yaw_time); 
+				startTraj(_prev_sp, yaw_d, yaw_time);  //Blocking
 			 	startTraj(sp, yaw_d, duration);	
 
 			 	_prev_sp = sp;
 			 	_prev_yaw_sp = yaw_d;
 
-				wp_index++;
+				
 				*id_wp_ptr = wp_index;
+				wp_index++;
+
+				if (_stop_trajectory || _replan) {
+					//holdTraj();
+					// std::cout << "Replanning...\n";
+					// plan(wp,opt_poses);
+					// _replan = false;
+				}
 			}
 
-			//startWPTraj(opt_poses);
-
+			// while(_trajectory.isReady()){
+			// 	usleep(0.1e6);
+			// }
+			// _wp_traj_completed = true;
 
 		}
 		else if(cmd == "takeoff") {
@@ -382,7 +398,7 @@ void OffboardControl::key_input() {
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
 			yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-			duration = 0.1 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(_max_velocity);
+			duration = 0.0 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(2*_max_velocity);
 
 			this->arm();
 
@@ -419,6 +435,9 @@ void OffboardControl::key_input() {
 }
 
 void OffboardControl::holdTraj() {
+
+	RCLCPP_INFO(this->get_logger(),"Hold Trajectory Set");
+
 	std::vector<geometry_msgs::msg::PoseStamped> poses;
 	std::vector<double> times;
 	geometry_msgs::msg::PoseStamped p;
@@ -832,6 +851,35 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
     //     _replan = true;
     // }
 
+	usleep(10);
+
+    visualization_msgs::msg::Marker check_m;
+	// Set the frame, timestamp, and namespace
+	check_m.header.frame_id = "map";
+	check_m.header.stamp = this->get_clock()->now();
+	check_m.ns = "check";
+
+	// Set marker properties
+	check_m.type = visualization_msgs::msg::Marker::CUBE;
+	check_m.action = visualization_msgs::msg::Marker::ADD;
+
+	// Set the scale of the marker
+	check_m.scale.x = 0.15;
+	check_m.scale.y = 0.15;
+	check_m.scale.z = 0.15;
+
+	// Set the color of the marker
+	check_m.color.r = 1.0f;
+	check_m.color.g = 0.0f;
+	check_m.color.b = 0.0f;
+	check_m.color.a = 1.0;
+
+	// Marker lifetime
+	check_m.lifetime = rclcpp::Duration(0, 0); // Infinite lifetime
+
+	// Set marker ID
+	check_m.id = 97;
+
 	Eigen::Vector3d pt_check;
 	Eigen::Vector3d dir;
 	Eigen::Vector3d pt_i;
@@ -840,44 +888,58 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	double s[3]; //state
 	double step = 0.2;
 	bool segment_checked = false;
-
-	while( valid_path && !_stop_trajectory && *wp < poses.size()){
+	bool trajetory_is_completed = false;
+	bool is_last_sp = false;
+	//while( valid_path && !_stop_trajectory && *wp < poses.size()){
+	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
 
 		if(*wp != 0){
+			pt_i << _x.pose.position.y, _x.pose.position.x, -_x.pose.position.z;  // NED TO ENU !!
 
-			pt_i << _position(0), _position(1), _position(2);
-
-			for(int i=*wp + 1; i<poses.size(); i++ ) {
-
+			for(int i=*wp ; i<poses.size(); i++ ) {
+				//RCLCPP_WARN(get_logger(), "Checking wp %f", i);
 				pt_f << poses[i].position.x, poses[i].position.y, poses[i].position.z;
 				
 				dir = (pt_f - pt_i);
 				if (dir.norm() > 0.0) dir /= dir.norm();
+				pt_check = pt_i;
 				segment_checked = false;
 
     	        while( !segment_checked && valid_path) {
 
 					pt_check += dir*step;
-
+					check_m.pose.position.x = pt_check[0];
+					check_m.pose.position.y = pt_check[1];
+					check_m.pose.position.z = pt_check[2];
 					s[0] = pt_check[0];
 					s[1] = pt_check[1];
 					s[2] = pt_check[2];
 
 					valid_path = _pp->check_state(s);
 
-					segment_checked = ((pt_check-pt_f).norm() < step);
-
+					segment_checked = ((pt_check-pt_f).norm() < 2*step);
+					if( _rviz_output ) 
+						_check_path_pub->publish( check_m );
 				}
+				
 				pt_i = pt_f;
 
 				if(!valid_path) break;
 			}
 		}
+		
+		is_last_sp = (!_trajectory.isReady() && *wp == poses.size()-1);
+	
+		if( is_last_sp ){
+			_wp_traj_completed = true;
+			RCLCPP_WARN(get_logger(), "Checking path ENDED");
+		}
 	}
 	if( !valid_path ) {
 		RCLCPP_WARN(get_logger(), "New obstacle detected! Replan");
 		_replan = true;
-		_first_traj = false;
+		_stop_trajectory = true;
+		//_first_traj = false;
 	}
 }   
 

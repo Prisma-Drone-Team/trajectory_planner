@@ -19,6 +19,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
 	system 
 	thread 
@@ -54,7 +55,7 @@ target_include_directories(frame_transforms PUBLIC
 
 # /offboard_control
 add_executable(offboard_control src/offboard/offboard_control.cpp src/offboard/Trajectory.cpp src/offboard/spline/planner_spline.cpp src/offboard/planner/planner.cpp)
-ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl octomap octomap_msgs nav_msgs)
+ament_target_dependencies(offboard_control rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 ompl fcl octomap octomap_msgs nav_msgs visualization_msgs)
 target_include_directories(offboard_control PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
@@ -73,7 +74,7 @@ install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 ############
 
 # Export information to downstream packages
-ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs nav_msgs fcl ompl)
+ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs nav_msgs fcl ompl visualization_msgs)
 
 ament_export_targets(export_frame_transforms HAS_LIBRARY_TARGET)
 
