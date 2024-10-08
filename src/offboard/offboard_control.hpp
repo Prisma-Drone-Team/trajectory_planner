@@ -184,6 +184,7 @@ private:
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
 	matrix::Vector3f _prev_sp{};
+	matrix::Vector3f _stop_sp{};
 	matrix::Quaternionf _prev_att_sp{};
 	float _prev_yaw_sp;
 
