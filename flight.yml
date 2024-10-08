@@ -20,6 +20,7 @@ windows:
         - ros2 launch mavros px4.launch fcu_url:=/dev/ttyACM0:57600
     - shell_command:
         - cd ~/ros2_ws && source install/setup.bash
+        #- ros2 run ov_republisher 
     - shell_command:
         - cd ~/ros2_ws && source install/setup.bash
         
