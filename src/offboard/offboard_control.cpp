@@ -72,7 +72,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	boost::thread key_input_t( &OffboardControl::key_input, this );
 
 	//---Init planner
-	this->declare_parameter("max_yaw_rate", .5);
+	this->declare_parameter("max_yaw_rate", .3);
 	_max_yaw_rate = this->get_parameter("max_yaw_rate").as_double();
 	RCLCPP_INFO(get_logger(), "max_yaw_rate: %f", _max_yaw_rate);
 	this->declare_parameter("max_velocity", .25);
@@ -87,7 +87,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_xbounds[0] = this->get_parameter("x_lower_bound").as_double();
 	RCLCPP_INFO(get_logger(), "x_lower_bound: %f", _xbounds[0]);
 	
-	this->declare_parameter("x_upper_bound",21.0);
+	this->declare_parameter("x_upper_bound",21.5);
 	_xbounds[1] = this->get_parameter("x_upper_bound").as_double();
 	RCLCPP_INFO(get_logger(), "x_upper_bound: %f", _xbounds[1] );
 
@@ -95,15 +95,15 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_ybounds[0] = this->get_parameter("y_lower_bound").as_double();
 	RCLCPP_INFO(get_logger(), "y_lower_bound: %f", _ybounds[0]);
 	
-	this->declare_parameter("y_upper_bound",21.0);
+	this->declare_parameter("y_upper_bound",11.0);
 	_ybounds[1] = this->get_parameter("y_upper_bound").as_double();
 	RCLCPP_INFO(get_logger(), "y_upper_bound: %f", _ybounds[1] );
 
-	this->declare_parameter("z_lower_bound", -5.0);
+	this->declare_parameter("z_lower_bound", -1.0);
 	_zbounds[0] = this->get_parameter("z_lower_bound").as_double();
 	RCLCPP_INFO(get_logger(), "z_lower_bound: %f", _ybounds[0]);
 	
-	this->declare_parameter("z_upper_bound",21.0);
+	this->declare_parameter("z_upper_bound",5.0);
 	_zbounds[1] = this->get_parameter("z_upper_bound").as_double();
 	RCLCPP_INFO(get_logger(), "z_upper_bound: %f", _ybounds[1] );
 
@@ -115,15 +115,15 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_y_valid_min = this->get_parameter("y_valid_min").as_double();
 	RCLCPP_INFO(get_logger(), "y_valid_min: %f", _y_valid_min);
 
-	this->declare_parameter("x_valid_max",10.0);
+	this->declare_parameter("x_valid_max",19.5);
 	_x_valid_max = this->get_parameter("x_valid_max").as_double();
 	RCLCPP_INFO(get_logger(), "x_valid_max: %f", _x_valid_max);
 
-	this->declare_parameter("y_valid_max",10.0);
+	this->declare_parameter("y_valid_max",9.5);
 	_y_valid_max = this->get_parameter("y_valid_max").as_double();
 	RCLCPP_INFO(get_logger(), "y_valid_max: %f", _y_valid_max);
 
-	this->declare_parameter("z_motion_threshold",1.0);
+	this->declare_parameter("z_motion_threshold",0.25);
 	_z_motion_threshold = this->get_parameter("z_motion_threshold").as_double();
 	RCLCPP_INFO(get_logger(), "z_motion_threshold: %f", _z_motion_threshold);
 
