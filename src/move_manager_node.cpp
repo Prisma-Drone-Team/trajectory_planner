@@ -152,7 +152,7 @@ class MoveManager : public rclcpp::Node
 
             goal.header.stamp = this->get_clock()->now();
             goal.header.frame_id = "odom"; //"map"
-            goal.child_frame_id = "appr/goal";
+            goal.child_frame_id = "goal3";
             goal.transform.translation.x = 5.0;
             goal.transform.translation.y = 5.0;
             goal.transform.translation.z = 1.0;
@@ -222,7 +222,7 @@ bool MoveManager::checkTransform(const std::string& frame_name, geometry_msgs::m
         return true;
     } catch (const tf2::TransformException & ex) {
 
-        RCLCPP_INFO( this->get_logger(), "Could not find a transform from map to %s: %s", frame_name.c_str(), ex.what());
+        RCLCPP_WARN( this->get_logger(), "Could not find a transform from map to %s: %s", frame_name.c_str(), ex.what());
         return false;
     }
 
@@ -323,7 +323,7 @@ std::vector<std::string> MoveManager::instance2vector(std::string schemaInstance
 
 
 void MoveManager::pdt_callback(const std_msgs::msg::String::SharedPtr msg){
-    RCLCPP_INFO(this->get_logger(), "GCS command received: %s", msg->data.c_str());
+    //RCLCPP_INFO(this->get_logger(), "GCS command received: %s", msg->data.c_str());
 
     _received_command = msg->data;
 }
@@ -353,42 +353,49 @@ void MoveManager::pdt_input(){
     while(rclcpp::ok()) {
 
      
-        if ( _current_command != _received_command ) {
+        if(_current_command != _received_command) {
 
             cmd_to_send = "stop";
             send_move_cmd(cmd_to_send,sp);
 
             while( _plan_status != "STOPPED" && _plan_status != "IDLE"){
                 usleep(0.1*16);
+                RCLCPP_INFO(this->get_logger(), "Waiting for stop");
             }
 
             //start action
-            _current_command = _received_command;
-            cv = instance2vector( _current_command );
+            
+            cv = instance2vector( _received_command);
 
-            RCLCPP_INFO(this->get_logger(),"New command %s", _current_command.c_str() );
+            RCLCPP_INFO(this->get_logger(),"New command %s", _received_command.c_str() );
 
             if ( cv[0] == "flyto" ) {
                 
                 if(checkTransform(cv[1], sp)){
-                    cmd_to_send = "go";  
+                    _current_command = _received_command;
+                    cmd_to_send = "nav";  
                     send_move_cmd(cmd_to_send,sp);
+                    RCLCPP_INFO(this->get_logger(), "NAV command sent");
                 }           
 
             }
             else if ( cv[0] == "takeoff" )
-            {
+            {   
                 cmd_to_send = "takeoff";
+                _current_command = _received_command;
                 sp.position.z = 1.5;
                 send_move_cmd(cmd_to_send,sp);
+                RCLCPP_INFO(this->get_logger(), "TAKEOFF command sent");
             }
             else if ( cv[0] == "land" )
             {
                 cmd_to_send = "land";
+                _current_command = _received_command;
                 send_move_cmd(cmd_to_send,sp);
+                RCLCPP_INFO(this->get_logger(), "LAND command sent");
             }
             else {
-
+                RCLCPP_ERROR(this->get_logger(), "Invalid command");
             }
             
         }
@@ -397,8 +404,9 @@ void MoveManager::pdt_input(){
             if ( cv[0] == "flyto" ) {
                 
                 if(checkTransform(cv[1], sp)){
-                    cmd_to_send = "go";  
+                    cmd_to_send = "nav";  
                     send_move_cmd(cmd_to_send,sp);
+                    RCLCPP_INFO(this->get_logger(), "REPLAN: NAV command sent");
                 }           
 
             }
