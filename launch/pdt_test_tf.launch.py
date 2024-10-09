@@ -14,27 +14,21 @@ def generate_launch_description():
         # OAk-D Lite
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['2', '5', '1.5', '0','0', '0', 'map', 'goal1']),
+            arguments=['2', '5', '2', '0','0', '0', 'map', 'goal1']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['1', '4', '1.5',  '0', '0', '0', 'map', 'goal2']),
+            arguments=['1', '4', ' 2',  '0', '0', '0', 'map', 'goal2']),
             
     	Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['8', '4', '1.5',  '0', '0', '0', 'map', 'goal3']), 
+            arguments=['8', '4', ' 2',  '0', '0', '0', 'map', 'goal3']), 
             
     	Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['7', '8', '1.5',  '0', '0', '0', 'map', 'goal4']), 
+            arguments=['7', '8', ' 2',  '0', '0', '0', 'map', 'goal4']), 
     	Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['12', '7', '1.5',  '0', '0', '0', 'map', 'goal5']), 
-        Node(
-            package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['15', '6', '1.5',  '0', '0', '0', 'map', 'goal6']), 
-        Node(
-            package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['15', '1', '1.5',  '0', '0', '0', 'map', 'goal7']), 
+            arguments=['12', '7', ' 2',  '0', '0', '0', 'map', 'goal5']), 
         # Realsense camera
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
