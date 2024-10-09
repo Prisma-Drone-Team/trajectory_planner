@@ -88,9 +88,11 @@ using namespace std::chrono_literals;
 using namespace px4_msgs::msg;
 
 enum NodeState {
-	STOPPED = 0,
-	FLYING,
-	HOVERING
+	IDLE = 0,
+	STOPPED = 1,
+	REPLAN = 2,
+	SP_ENDED = 3,
+	WP_ENDED = 4,
 };
 
 
@@ -111,12 +113,18 @@ public:
 
 	void key_input();
 
+	void move_cmd();
 
 	void flight_termination(float val);
 
 
+
+
 private:
+
 	void timer_callback();
+	void status_update();
+	
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 	void check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
@@ -126,6 +134,7 @@ private:
 
 	rclcpp::TimerBase::SharedPtr _timer;
 	rclcpp::TimerBase::SharedPtr _check_timer;
+	rclcpp::TimerBase::SharedPtr _status_timer;
 	milliseconds _timer_period{10ms};
 	
 	float _timer_freq{100.0f};
@@ -141,6 +150,8 @@ private:
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _check_path_pub;
+	
+	rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _plan_state_publisher;
 
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
@@ -201,10 +212,17 @@ private:
 	double _max_yaw_rate, _max_velocity;
 
 	matrix::Matrix3f _T_enu_to_ned;
-	bool _map_set, _replan;
+	bool _map_set;
 	double _use_octomap, _rviz_output, _dist_from_th_error;
 	int _replan_cnt;
 
 	bool _stop_trajectory{false}, _plan_is_valid{true}, _wp_traj_completed{false};
+
+
+	std::string _cmd="";
+	matrix::Vector3f _cmd_sp;
+	bool _new_cmd{false};
+	bool _replan{false};
+	std::string _status="IDLE";
 
 };
