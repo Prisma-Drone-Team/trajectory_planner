@@ -21,6 +21,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2/exceptions.h>
 
+#define SIMULATION 1
 
 class MoveManager : public rclcpp::Node
 {
@@ -38,7 +39,7 @@ class MoveManager : public rclcpp::Node
             _tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
             _static_tf_broadcaster = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
 
-            this->staticTfPub();
+            
 
             _pdt_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             _pdt_tf_listener=   std::make_shared<tf2_ros::TransformListener>(*_pdt_tf_buffer);
@@ -47,84 +48,55 @@ class MoveManager : public rclcpp::Node
 		    auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
             //_odom_publisher = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
+            if(SIMULATION==1){
+                this->staticTfPub();
+                _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", qos_px4,
+                    [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
+                        // Prepare the TransformStamped message
+                        geometry_msgs::msg::TransformStamped transform_stamped;
 
-            _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", qos_px4,
-                [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
-                    // Prepare the TransformStamped message
-                    geometry_msgs::msg::TransformStamped transform_stamped;
+                        // Set the header
+                        transform_stamped.header.stamp = this->get_clock()->now();
+                        transform_stamped.header.frame_id = "odomNED";  // Set to appropriate frame (ENU)
+                        transform_stamped.child_frame_id = "base_link_FRD";  // Set to appropriate frame
 
-                    // Set the header
-                    transform_stamped.header.stamp = this->get_clock()->now();
-                    transform_stamped.header.frame_id = "odomNED";  // Set to appropriate frame (ENU)
-                    transform_stamped.child_frame_id = "base_link_FRD";  // Set to appropriate frame
+                        // Set translation (position)
+                        transform_stamped.transform.translation.x = msg->position[0];
+                        transform_stamped.transform.translation.y = msg->position[1];
+                        transform_stamped.transform.translation.z = msg->position[2];
 
-                    // Set translation (position)
-                    transform_stamped.transform.translation.x = msg->position[0];
-                    transform_stamped.transform.translation.y = msg->position[1];
-                    transform_stamped.transform.translation.z = msg->position[2];
+                        // Set rotation (orientation)
+                        transform_stamped.transform.rotation.x = msg->q.data()[1];
+                        transform_stamped.transform.rotation.y = msg->q.data()[2];
+                        transform_stamped.transform.rotation.z = msg->q.data()[3];
+                        transform_stamped.transform.rotation.w = msg->q.data()[0];
 
-                    // Set rotation (orientation)
-                    transform_stamped.transform.rotation.x = msg->q.data()[1];
-                    transform_stamped.transform.rotation.y = msg->q.data()[2];
-                    transform_stamped.transform.rotation.z = msg->q.data()[3];
-                    transform_stamped.transform.rotation.w = msg->q.data()[0];
+                        // Broadcast the transform
+                        _tf_broadcaster->sendTransform(transform_stamped);
+                        
+ 
+                });
+            }
 
-                    // Broadcast the transform
-                    _tf_broadcaster->sendTransform(transform_stamped);
-                    
-                     // Publish odometry message
-                    // nav_msgs::msg::Odometry odom;
-                    // odom.header.stamp = this->get_clock()->now();
-                    // odom.header.frame_id = "odomNED";  // Parent frame
-                    // odom.child_frame_id = "base_link_FRD";  // Child frame
-                    
-                    // // Set position
-                    // odom.pose.pose.position.x = msg->position[0];
-                    // odom.pose.pose.position.y = msg->position[1];
-                    // odom.pose.pose.position.z = msg->position[2];
-                    // odom.pose.pose.orientation.x = msg->q.data()[1];
-                    // odom.pose.pose.orientation.y = msg->q.data()[2];
-                    // odom.pose.pose.orientation.z = msg->q.data()[3];
-                    // odom.pose.pose.orientation.w = msg->q.data()[0];
-
-                    // // Set velocity
-                    // odom.twist.twist.linear.x = msg->velocity[0];
-                    // odom.twist.twist.linear.y = msg->velocity[1];
-                    // odom.twist.twist.linear.z = msg->velocity[2];
-
-                    // // Set angular velocity
-                    // odom.twist.twist.angular.x = msg->angular_velocity[0];
-                    // odom.twist.twist.angular.y = msg->angular_velocity[1];
-                    // odom.twist.twist.angular.z = msg->angular_velocity[2];
-
-                    // odom.pose.covariance[0] = msg->position_variance[0]; 
-                    // odom.pose.covariance[7] = msg->position_variance[1]; 
-                    // odom.pose.covariance[14] = msg->position_variance[2]; 
-                    // odom.pose.covariance[21] = msg->orientation_variance[0];  
-                    // odom.pose.covariance[28] = msg->orientation_variance[1]; 
-                    // odom.pose.covariance[35] = msg->orientation_variance[2];  
-
-                    // // Set covariance for twist (uncertainty in linear and angular velocities)
-                    // odom.twist.covariance[0] = msg->velocity_variance[0];  // x velocity variance
-                    // odom.twist.covariance[7] = msg->velocity_variance[1];  // y velocity variance
-                    // odom.twist.covariance[14] = msg->velocity_variance[2]; // z velocity variance (unused for 2D)
-                    // odom.twist.covariance[21] = 0.0;  // Roll velocity variance (fixed for 2D)
-                    // odom.twist.covariance[28] = 0.0;  // Pitch velocity variance (fixed for 2D)
-                    // odom.twist.covariance[35] = 0.0;  // Yaw velocity variance
-
-                    //_odom_publisher->publish(odom);
-            });
-            
-
-            _pdt_sub = this->create_subscription<std_msgs::msg::String>("/seed_inspect_drone/command", qos, std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
+            _pdt_sub = this->create_subscription<std_msgs::msg::String>("/seed_pdt_drone/command", qos, std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
 
             _plan_status_sub = this->create_subscription<std_msgs::msg::String>("/leo/drone/plan_status", 1,
                 [this](const std_msgs::msg::String::UniquePtr msg) {
                     _plan_status = msg->data;
+
+                    if(_plan_status == "REPLAN" || _plan_status == "FAILED"){
+                        std_msgs::msg::String pdt_msg; 
+                        std::vector<std::string> cv = instance2vector(_current_command);  
+                        pdt_msg.data = cv[1]+".unreachable";
+                        _pdt_publisher->publish(pdt_msg);  
+                    }
+
                 });
             
             boost::thread key_input_t( &MoveManager::key_input, this);
             boost::thread pdt_input_t( &MoveManager::pdt_input, this);
+
+            _pdt_publisher = this->create_publisher<std_msgs::msg::String>("/seed_pdt_drone/status",1);  
 
         }
 
@@ -179,7 +151,7 @@ class MoveManager : public rclcpp::Node
         rclcpp::Publisher<trajectory_planner::msg::MoveCmd>::SharedPtr _publisher;
         
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr _odom_publisher;
-
+        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _pdt_publisher;
         // Subscriber for vehicle odometry
         rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odometry_sub;
          
@@ -325,6 +297,7 @@ std::vector<std::string> MoveManager::instance2vector(std::string schemaInstance
 void MoveManager::pdt_callback(const std_msgs::msg::String::SharedPtr msg){
 
     _received_command = msg->data;
+
 }
 
 
@@ -410,7 +383,7 @@ void MoveManager::pdt_input(){
 
         //     }
         // }
-
+                  
     }
 
     

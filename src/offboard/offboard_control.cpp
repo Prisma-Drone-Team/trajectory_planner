@@ -260,7 +260,8 @@ void OffboardControl::move_cmd(){
 
 	while(rclcpp::ok()) {
 
-		if(cmd != _cmd || _status=="REPLAN") {
+		//if(cmd != _cmd || _status=="REPLAN") {
+		if(cmd != _cmd){
 			cmd = _cmd;
 			sp = _cmd_sp;
 
@@ -828,15 +829,6 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	geometry_msgs::msg::PoseStamped p;
 	nav_msgs::msg::Path generated_path;
 	generated_path.header.frame_id = "map";
-	
-    // geometry_msgs::PoseStamped p;
-    // p.header.frame_id = "drone/map";
-
-    // Eigen::Vector3d lp;
-    // Eigen::Vector3d gp;
-
-    // nav_msgs::Path generated_path_opt;
-    // generated_path_opt.header.frame_id = "drone/map";
 
     _pp->set_start_state(s);
     _pp->set_goal_state(g);
@@ -912,78 +904,6 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 
 void OffboardControl::check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp) {
     
-    // Eigen::Vector3d dir;
-    // Eigen::Vector3d v0;
-    // Eigen::Vector3d v1;
-    // Eigen::Vector3d pt_check;
-    // dir << 0.0, 0.0, 0.0;
-    // bool valid_path = true;
-    // double s[3]; //state
-    
-    // for(int k=0; k<poses.size(); k++) {
-    //     std::cout<<"\t"<<poses[k].position.x<<"---"<<poses[k].position.y<<"---"<<poses[k].position.z<<std::endl;
-	// 	if( k == 0 ) v0 = _w_p;
-	// 	else v0 <<  poses[k-1].position.x,  poses[k-1].position.y,  poses[k-1].position.z;
-
-	// 	v1 << poses[k].position.x, poses[k].position.y, poses[k].position.z;
-
-	// 	dir = v1 - v0;
-		
-	// 	dir /= dir.norm();
-	// 	std::cout<<"\t\t"<<dir<<std::endl;
-    // }
-    
-    // while( valid_path && (!_stop_trajectory && _trajectory_execution && *wp < poses.size()) ) {
-    
-    //     for( int i=*wp; i<poses.size(); i++ ) {
-
-    //         while(*wp == 0){
-    //             usleep(0.1e6);     
-    //         }
-                   
-    //         if( i == *wp ){
-    //             v0 = _w_p;
-    //             v1 << poses[i].position.x, poses[i].position.y, poses[i].position.z;
-    //         } 
-    //         else{
-    //             v0 <<  poses[i-1].position.x,  poses[i-1].position.y,  poses[i-1].position.z;
-    //             v1 << poses[i].position.x, poses[i].position.y, poses[i].position.z;
-    //         } 
-
-    //         dir = v1 - v0;
-            
-    //         dir /= dir.norm();
-    //         pt_check = v0;
-
-    //         bool segment_checked = false;
-
-    //         double step = 0.2; //a param?
-
-    //         while( !segment_checked && valid_path) {
-
-    //             pt_check += dir*step;
-    //             check_m.pose.position.x = pt_check[0];
-    //             check_m.pose.position.y = pt_check[1];
-    //             check_m.pose.position.z = pt_check[2];
-
-    //             s[0] = pt_check[0];
-    //             s[1] = pt_check[1];
-    //             s[2] = pt_check[2];
-
-    //             segment_checked = ((pt_check-v1).norm() < 0.1);
-    //             valid_path = _pp->check_state(s);
-    //         }
-    //     }   
-       
-    // }
-
-    // if( !valid_path ) {
-	// 	RCLCPP_WARN(rclcpp::get_logger("OFFBOARD"), "New obstacle detected! Replan");
-    //     _replan = true;
-    // }
-
-	//usleep(10);
-
     visualization_msgs::msg::Marker check_m;
 	// Set the frame, timestamp, and namespace
 	check_m.header.frame_id = "map";
@@ -1080,7 +1000,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 		_prev_sp = _position;
 		_prev_att_sp = _attitude;
 		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
-		_status = "REPLAN";
+		_status = "REPLAN"; 
 	}
 }   
 
