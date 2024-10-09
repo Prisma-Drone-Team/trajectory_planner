@@ -18,7 +18,17 @@ def generate_launch_description():
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['1', '4', ' 2',  '0', '0', '0', 'map', 'goal2']),
-        
+            
+    	Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['8', '4', ' 2',  '0', '0', '0', 'map', 'goal3']), 
+            
+    	Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['7', '8', ' 2',  '0', '0', '0', 'map', 'goal4']), 
+    	Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['2', '7', ' 2',  '0', '0', '0', 'map', 'goal5']), 
         # Realsense camera
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
