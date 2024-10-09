@@ -22,7 +22,10 @@ def generate_launch_description():
           'map_frame_id':'map',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
-          'approx_sync':True}]
+          'approx_sync':True,
+          'qos_image':2,
+          'qos':2,
+          }]
 
     remappings=[
           ('rgb/image', '/camera'),

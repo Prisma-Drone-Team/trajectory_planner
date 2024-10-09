@@ -18,7 +18,7 @@ windows:
         - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image # /odom@nav_msgs/msg/Odometry@gz.msgs.OdometryWithCovariance
     - shell_command:
         - sleep 5  
-        - ros2 run ros_gz_image image_bridge /camera /depth_camera
+        #- ros2 run ros_gz_image image_bridge /camera /depth_camera
     - shell_command:
         - sleep 15
         - cd ros2_ws && source install/setup.bash
