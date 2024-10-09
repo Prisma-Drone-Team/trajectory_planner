@@ -323,7 +323,6 @@ std::vector<std::string> MoveManager::instance2vector(std::string schemaInstance
 
 
 void MoveManager::pdt_callback(const std_msgs::msg::String::SharedPtr msg){
-    //RCLCPP_INFO(this->get_logger(), "GCS command received: %s", msg->data.c_str());
 
     _received_command = msg->data;
 }
@@ -399,18 +398,18 @@ void MoveManager::pdt_input(){
             }
             
         }
-        if( _current_command == _received_command && _plan_status == "REPLAN"){
+        // if( _current_command == _received_command && _plan_status == "REPLAN"){
 
-            if ( cv[0] == "flyto" ) {
+        //     if ( cv[0] == "flyto" ) {
                 
-                if(checkTransform(cv[1], sp)){
-                    cmd_to_send = "nav";  
-                    send_move_cmd(cmd_to_send,sp);
-                    RCLCPP_INFO(this->get_logger(), "REPLAN: NAV command sent");
-                }           
+        //         if(checkTransform(cv[1], sp)){
+        //             cmd_to_send = "nav";  
+        //             send_move_cmd(cmd_to_send,sp);
+        //             RCLCPP_INFO(this->get_logger(), "REPLAN: NAV command sent");
+        //         }           
 
-            }
-        }
+        //     }
+        // }
 
     }
 

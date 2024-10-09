@@ -9,8 +9,8 @@ offboard_control:
     y_lower_bound: -5.0
     x_upper_bound: 21.5
     y_upper_bound: 11.0
-    z_lower_bound: -1.0
-    z_upper_bound: 5.0
+    z_lower_bound: 1.2
+    z_upper_bound: 2.0
 
     x_valid_min: -10.0
     x_valid_max: 19.5
