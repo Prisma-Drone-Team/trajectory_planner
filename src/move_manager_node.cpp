@@ -102,7 +102,7 @@ class MoveManager : public rclcpp::Node
 
                 });
             
-            boost::thread key_input_t( &MoveManager::key_input, this);
+            //boost::thread key_input_t( &MoveManager::key_input, this);
             boost::thread pdt_input_t( &MoveManager::pdt_input, this);
 
             _pdt_publisher = this->create_publisher<std_msgs::msg::String>("/seed_pdt_drone/status",1);  
@@ -336,7 +336,8 @@ void MoveManager::pdt_input(){
         usleep(0.01e6);
 
         if(_current_command != _received_command) {   // update command only if different
-            
+            std::cout<<_current_command<<std::endl;
+            std::cout<<_received_command<<std::endl;
             cv = instance2vector( _received_command);
             
             // STOP existing command for overriding it
