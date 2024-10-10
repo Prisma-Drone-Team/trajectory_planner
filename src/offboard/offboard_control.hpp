@@ -53,6 +53,7 @@
 #include <px4_msgs/msg/timesync_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
+#include <px4_msgs/msg/vehicle_status.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -124,7 +125,7 @@ private:
 
 	void timer_callback();
 	void status_update();
-	
+	void status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg); 
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 	void check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
@@ -136,6 +137,7 @@ private:
 	rclcpp::TimerBase::SharedPtr _check_timer;
 	rclcpp::TimerBase::SharedPtr _status_timer;
 	milliseconds _timer_period{10ms};
+	milliseconds _status_timer_period{200ms};
 	
 	float _timer_freq{100.0f};
 
@@ -143,7 +145,7 @@ private:
 	void holdTraj();
 	void startTraj(matrix::Vector3f pos, float yaw, double d);
 	void startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses);
-	void plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
+	bool plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
@@ -155,8 +157,10 @@ private:
 
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
+	 rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _px4_vehicle_status_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
+
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -196,6 +200,7 @@ private:
 	float _starting_yaw{};
 	matrix::Vector3f _prev_sp{};
 	matrix::Vector3f _stop_sp{};
+	matrix::Quaternionf _stop_att_sp{};
 	matrix::Quaternionf _prev_att_sp{};
 	float _prev_yaw_sp;
 
@@ -223,6 +228,7 @@ private:
 	matrix::Vector3f _cmd_sp;
 	bool _new_cmd{false};
 	bool _replan{false};
+	bool _armed{false};
 	std::string _status="IDLE";
 
 };
