@@ -1,7 +1,7 @@
 session_name: simulation
 socket_name: drone
 environment:
-  POSE_1: "0,0"
+  ROS_DOMAIN_ID: "77"
 pre_window: 
 windows:
 - window_name: px4
@@ -15,13 +15,14 @@ windows:
         - MicroXRCEAgent udp4 -p 8888
     - shell_command:
         - sleep 5           
-        - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image # /odom@nav_msgs/msg/Odometry@gz.msgs.OdometryWithCovariance
+        - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image 
     - shell_command:
         - sleep 5  
-        #- ros2 run ros_gz_image image_bridge /camera /depth_camera
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 launch trajectory_planner rtabmap_sim.launch.py
     - shell_command:
         - sleep 15
-        - cd ros2_ws && source install/setup.bash
+        - cd ~/ros2_ws && source install/setup.bash
         - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/liboctomap.so ros2 run rviz2 rviz2 -d ~/ros2_ws/src/pkg/trajectory_planner/rviz/leo.rviz
 - window_name: rtabmap
   layout: tiled
@@ -37,7 +38,8 @@ windows:
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner rtabmap_sim.launch.py
+        - ros2 run trajectory_planner offboard_control
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" 

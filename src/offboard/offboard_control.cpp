@@ -5,6 +5,7 @@
 #define START_FROM_LAST_MEAS 0
 #define SIMULATION 1
 
+
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
 	_offboard_control_mode_publisher =
@@ -67,7 +68,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 
 			});
 
-	
+    //_px4_vehicle_status_sub = this->create_subscription<px4_msgs::msg::VehicleStatus>("/fmu/out/vehicle_status", qos, std::bind(&OffboardControl::status_callback, this, std::placeholders::_1));
+
 	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>("/octomap_binary", qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
 	_map_set = false;	
 
@@ -78,13 +80,13 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	cmd_qos_profile.durability = RMW_QOS_POLICY_DURABILITY_VOLATILE; 
 	cmd_qos_profile.history = RMW_QOS_POLICY_HISTORY_KEEP_LAST;
 
-	auto cmd_qos = rclcpp::QoS(rclcpp::QoSInitialization(cmd_qos_profile.history, 5), cmd_qos_profile);
+	auto cmd_qos = rclcpp::QoS(rclcpp::QoSInitialization(cmd_qos_profile.history, 1), cmd_qos_profile);
 
 	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", cmd_qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1));
 
 	_timer = this->create_wall_timer(_timer_period, std::bind(&OffboardControl::timer_callback, this));
 
-	_status_timer = this->create_wall_timer(_timer_period, std::bind(&OffboardControl::status_update, this));
+	_status_timer = this->create_wall_timer(_status_timer_period, std::bind(&OffboardControl::status_update, this));
 
 
 	boost::thread key_input_t( &OffboardControl::key_input, this );
@@ -122,7 +124,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_zbounds[0] = this->get_parameter("z_lower_bound").as_double();
 	RCLCPP_INFO(get_logger(), "z_lower_bound: %f", _ybounds[0]);
 	
-	this->declare_parameter("z_upper_bound",1.8);
+	this->declare_parameter("z_upper_bound",2.2);
 	_zbounds[1] = this->get_parameter("z_upper_bound").as_double();
 	RCLCPP_INFO(get_logger(), "z_upper_bound: %f", _ybounds[1] );
 
@@ -158,8 +160,9 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
+	_replan_cnt = 0;
     
-	if(SIMULATION == 1){
+	if(SIMULATION){
 		_T_enu_to_ned.setZero();
 		_T_enu_to_ned(0,1) =  1.0;
 		_T_enu_to_ned(1,0) =  1.0;
@@ -172,6 +175,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	}
 }
 
+// void OffboardControl::status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg){
+// 	_armed = (msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED);
+// }
+
 void OffboardControl::status_update(){
 	auto message = std_msgs::msg::String();
 	message.data = _status;
@@ -183,7 +190,7 @@ void OffboardControl::octomap_callback(const octomap_msgs::msg::Octomap::SharedP
     octomap::OcTree* tree_oct = (octomap::OcTree*)tect;
 	_pp->set_octo_tree(tree_oct);
 	_map_set = true;
-	//RCLCPP_INFO(get_logger(), "Map got");
+
 }
 
 void OffboardControl::timer_callback() {
@@ -208,13 +215,15 @@ void OffboardControl::timer_callback() {
 	if(_stop_trajectory){	
 		holdTraj();
 
-		// if(!_status == "REPLAN")
-		// 	_status = "STOPPED";
-
 		_x.pose.position.x = _stop_sp(0);
 		_x.pose.position.y = _stop_sp(1);
 		_x.pose.position.z = _stop_sp(2);
 
+		_x.pose.orientation.w = _stop_att_sp(0);
+		_x.pose.orientation.x = _stop_att_sp(1);
+		_x.pose.orientation.y = _stop_att_sp(2);
+		_x.pose.orientation.z = _stop_att_sp(3);	
+		
 		_xd.twist.linear.x = 0.0;
 		_xd.twist.linear.y = 0.0;
 		_xd.twist.linear.z = 0.0;
@@ -224,9 +233,11 @@ void OffboardControl::timer_callback() {
 		_xdd.accel.linear.z = 0.0;
 
 		_prev_sp = _stop_sp;
+		_prev_att_sp = _stop_att_sp;
+		_prev_yaw_sp = matrix::Eulerf(_prev_att_sp).psi();
 
 	}
-
+	
 	// offboard_control_mode needs to be paired with trajectory_setpoint
 	publish_offboard_control_mode();
 	publish_trajectory_setpoint();
@@ -240,13 +251,25 @@ void OffboardControl::timer_callback() {
 
 void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg) {
 	matrix::Vector3f sp;
-	_cmd = msg->command.data;
+	std::string cmd;
+	cmd = msg->command.data;
 	sp(0) = msg->pose.position.x;
 	sp(1) = msg->pose.position.y;
 	sp(2) = msg->pose.position.z;	
 	
+
+	if(cmd == "stop"){
+		RCLCPP_INFO(this->get_logger(),"STOP command received");
+		_stop_trajectory = true;
+		_stop_sp = _position; 
+		_stop_att_sp = _attitude;
+	}
+
+	_cmd = cmd;
 	_cmd_sp = sp;
-	RCLCPP_INFO_ONCE(get_logger(), "Command received: %s. Pose: %f,%f,%f", msg->command.data.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
+
+
+	RCLCPP_INFO(get_logger(), "Command received: %s. Pose: %f,%f,%f", msg->command.data.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
 	
 }
 
@@ -254,44 +277,51 @@ void OffboardControl::move_cmd(){
 	
 	std::string cmd;
 	matrix::Vector3f sp;
+	matrix::Vector3f current_sp;
 	double duration;
 	double yaw_time;
 	float  yaw_d;
+	bool plan_has_result = true;
+
+	while(rclcpp::ok() && !_first_odom) {
+		usleep(0.1e6);
+	}
 
 	while(rclcpp::ok()) {
 
-		//if(cmd != _cmd || _status=="REPLAN") {
-		if(cmd != _cmd){
+		// Dummy state machine
+		if((_status == "RUNNING" && _replan == true && _stop_trajectory) || (_status == "REPLAN" && _replan_cnt < 5 && _stop_trajectory)){
+			_status = "REPLAN"; 
+			_prev_sp = _stop_sp; 
+			_prev_att_sp = _stop_att_sp;
+			_prev_yaw_sp = matrix::Eulerf(_prev_att_sp).psi();
+		}
+		else if(_status == "REPLAN" && _replan_cnt >= 5 || plan_has_result == false){
+			_status = "FAILED";
+		}
+		else if(_stop_trajectory){_status = "STOPPED";}
+		else if(!_trajectory.isReady()){_status = "IDLE";}
+		//else{_status = "RUNNING";}
+
+		
+		if(cmd != _cmd || _cmd_sp != current_sp || _status=="REPLAN") {  // New command-setpoint or REPLAN
+
+			RCLCPP_INFO(get_logger(), "Command received: %s. Pose: %f,%f,%f",cmd.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
 			cmd = _cmd;
-			sp = _cmd_sp;
+			current_sp = _cmd_sp;
+			sp = current_sp;
 
-			
-			if(cmd == "go") {
-
-				RCLCPP_INFO(this->get_logger(),"GO command received");
-				sp = _T_enu_to_ned*sp;
-
-
-				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-				yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
-
-				yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-				duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
-
-				_replan = false;
-				_stop_trajectory = false;
-
-				startTraj(_prev_sp, yaw_d, yaw_time); 
-				startTraj(sp, yaw_d, duration);
-
-				_prev_sp = sp;
-				_prev_yaw_sp = yaw_d;
-
+			if(_status == "REPLAN") {
+				_replan_cnt++;
+			}else{
+				_replan_cnt = 0;
+				_status = "RUNNING";
 			}
-			else if(cmd=="nav"){
-				
+
+			if(cmd =="nav"){			
 
 				RCLCPP_INFO(this->get_logger(),"NAV command received");
+				plan_has_result = false;
 
 				Eigen::Vector3d wp;
 				wp[0] = sp(0);
@@ -302,81 +332,93 @@ void OffboardControl::move_cmd(){
 				_wp_traj_completed = false;
 
 				auto opt_poses = std::make_shared<std::vector<POSE>>();
-				plan(wp,opt_poses);
-				
-				_replan = false;
+	
+				plan_has_result = plan(wp,opt_poses);
 
-				int wp_index = 1;
+				if(plan_has_result){
 
-				auto id_wp_ptr = std::shared_ptr<int>(new int(0));
-				//*id_wp_ptr = wp_index;
+					_replan = false;
 
-				std::vector<POSE> poses_to_check = *opt_poses;
+					int wp_index = 1;
 
+					auto id_wp_ptr = std::shared_ptr<int>(new int(0));
+					//*id_wp_ptr = wp_index;
 
-				boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr);
-				
-				_stop_trajectory = false;
+					std::vector<POSE> poses_to_check = *opt_poses;
 
-				while(wp_index<int(opt_poses->size()) && _stop_trajectory == false) {	
+					boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr);
 					
-					sp(0) = (*opt_poses)[wp_index].position.x;
-					sp(1) = (*opt_poses)[wp_index].position.y;
-					sp(2) = (*opt_poses)[wp_index].position.z;    // TODO proper conversion
-					
-					sp = _T_enu_to_ned*sp;
+					_stop_trajectory = false;
 
-					if(START_FROM_LAST_MEAS){
-						_prev_sp = _position;
-						_prev_att_sp = _attitude;
-						_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+					while(wp_index<int(opt_poses->size()) && _stop_trajectory == false) {	
+						
+						sp(0) = (*opt_poses)[wp_index].position.x;
+						sp(1) = (*opt_poses)[wp_index].position.y;
+						sp(2) = (*opt_poses)[wp_index].position.z;    // TODO proper conversion
+						
+						sp = _T_enu_to_ned*sp;
+
+						if(START_FROM_LAST_MEAS){
+							_prev_sp = _position;
+							_prev_att_sp = _attitude;
+							_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+						}
+
+						yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+						yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
+						yaw_time = 0.2 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+
+						duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+						
+						startTraj(_prev_sp, yaw_d, yaw_time);  //Blocking
+						startTraj(sp, yaw_d, duration);	
+						_prev_yaw_sp = yaw_d;
+	
+						*id_wp_ptr = wp_index;
+						wp_index++;
+
 					}
-
-					yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
-					yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
-					yaw_time = 0.2 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-
-					duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
-			
-					startTraj(_prev_sp, yaw_d, yaw_time);  //Blocking
-					startTraj(sp, yaw_d, duration);	
-
-					_prev_sp = sp;
-					_prev_yaw_sp = yaw_d;
-					
-					*id_wp_ptr = wp_index;
-					wp_index++;
-
 				}
 
 			}
 			else if(cmd == "takeoff") {
 				
 				RCLCPP_INFO(this->get_logger(),"TAKEOFF command received: %f", sp(2));
-				sp(0) = _position(1);   
-				sp(1) = _position(0);
 
-				sp = _T_enu_to_ned*sp;
+				sp(0) = _position(0);
+				sp(1) = _position(1);
+				sp(2) = -sp(2);
+			
 				yaw_d = matrix::Eulerf(_attitude).psi(); 
 				
 				yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-				duration = 0.1 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(2*_max_velocity);
-
+				duration = 1.0 + std::abs(sp(2))/(_max_velocity);
+				
 				this->arm();
+				// _first_traj = false;
+				// usleep(0.1e6);
+
+				_replan = false;
 				_stop_trajectory = false;
-			
+				 
 				startTraj(sp, yaw_d, duration);
 				
-				_prev_sp = sp;
-				_prev_yaw_sp = yaw_d;                 
+				// _prev_sp = sp;
+				// _prev_att_sp = _attitude;
+				// _prev_yaw_sp = yaw_d;   
+				
+
 			}
 			else if(cmd == "land") {
 				RCLCPP_INFO(this->get_logger(),"LAND command received");
-				_prev_sp(2) = 0.5; 
-
+				sp(0) = _position(0);
+				sp(1) = _position(1);
+				sp(2) = 0.5; 
+				current_sp = sp;
+				_replan = false;
 				_stop_trajectory = false; 
-				startTraj(_prev_sp, yaw_d, 15);	
-
+				startTraj(sp, yaw_d, 15);	 // TODO tune time
+				
 			}
 			else if(cmd == "arm") {
 				RCLCPP_INFO(this->get_logger(),"ARM command received");
@@ -387,17 +429,44 @@ void OffboardControl::move_cmd(){
 			else if(cmd == "term") {
 				RCLCPP_INFO(this->get_logger(),"TERM command received");
 				this->flight_termination(1);
+
+			}else if(cmd == "go") {
+				
+				RCLCPP_INFO(this->get_logger(),"GO command received");
+				sp = _T_enu_to_ned*sp;
+
+				yaw_d = atan2(sp(1)-_prev_sp(1),sp(0)-_prev_sp(0)); 
+				yaw_d = std::isnan(yaw_d) ? _prev_yaw_sp : yaw_d;
+
+				yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
+				duration = 0.5 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/_max_velocity;
+
+				_replan = false;
+				_stop_trajectory = false;
+				
+				startTraj(_prev_sp, yaw_d, yaw_time); 
+				startTraj(sp, yaw_d, duration);
+
+				// _prev_sp = sp;
+				// _prev_yaw_sp = yaw_d;
+
 			}
-			else if(cmd == "stop") {
-				RCLCPP_INFO(this->get_logger(),"STOP command received");
-				_stop_trajectory = true;
-				//_first_traj = false;
-				_stop_sp = _position;
-				_prev_sp = _stop_sp;
-				_status = "STOPPED";
-			}
+			 
+			// else if(cmd == "stop") {
+			// 	RCLCPP_INFO(this->get_logger(),"STOP command received");
+			// 	_stop_trajectory = true;
+			// 	//_first_traj = false;
+			// 	_stop_sp = _position;
+
+			// 	_prev_sp = _stop_sp;		
+			// 	_prev_att_sp = _attitude;
+			// 	_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+				
+				
+			// }
 			
 		}
+		usleep(0.1e6);
 	}
 }
 
@@ -505,16 +574,16 @@ void OffboardControl::key_input() {
 
 		}
 		else if(cmd == "takeoff") {
-			sp(0) = _position(1);   
-			sp(1) = _position(0);
+
+			sp = _position;
 			std::cout << "Enter takeoff altitude (ENU frame): "; 
 			std::cin >> sp(2);
+			sp(2) = - sp(2);
 			
-			sp = _T_enu_to_ned*sp;
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
 			yaw_time = 0.1 + std::abs(_prev_yaw_sp - yaw_d)/_max_yaw_rate;
-			duration = 0.0 + std::sqrt(pow(sp(0) - _prev_sp(0),2)+pow(sp(1) - _prev_sp(1),2)+pow(sp(2) - _prev_sp(2),2))/(2*_max_velocity);
+			duration = 0.0 + std::sqrt(pow(sp(2) - _prev_sp(2),2))/(2*_max_velocity);
 
 			this->arm();
 			_stop_trajectory = false; 
@@ -527,9 +596,9 @@ void OffboardControl::key_input() {
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
-			_prev_sp(2) = 0.5; 
+			sp(2) = 0.5; 
 			_stop_trajectory = false; 
-			startTraj(_prev_sp, yaw_d, 15);	 // TODO tune time
+			startTraj(sp, yaw_d, 15);	 // TODO tune time
 		}
 		else if(cmd == "arm") {
 			RCLCPP_INFO(this->get_logger(),"Arm command received");
@@ -545,6 +614,7 @@ void OffboardControl::key_input() {
 			//_first_traj = false;
 			_status = "STOPPED";
 			_stop_sp = _position;
+			_stop_att_sp = _attitude;
 			_prev_sp = _stop_sp;
 		}
 		else {
@@ -592,7 +662,7 @@ void OffboardControl::holdTraj(){
 void OffboardControl::arm() {
 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
 
-	RCLCPP_INFO(this->get_logger(), "Arm command send");
+	RCLCPP_INFO_ONCE(this->get_logger(), "Arm command send");
 }
 
 void OffboardControl::disarm() {
@@ -793,7 +863,7 @@ void OffboardControl::startTraj(matrix::Vector3f pos, float yaw, double d) {
 	
 }
 
-void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
+bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses) {
 
     if( _use_octomap == 1.0) {
         while(!_map_set) usleep(0.1*1e6);
@@ -868,12 +938,12 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 
 	if( ret == -3 ) {
         RCLCPP_ERROR(get_logger(),"Goal state not valid!");
-		_status = "FAILED";
+		return false;
     }
     else {
 		if( ret < 0 || (*opt_poses).size() < 2 ){
 			RCLCPP_ERROR(get_logger(),"Planner not correctly initialized"); 
-			_status = "FAILED";
+			return false;
 		}else {
 
 			for( int i=0; i<(*opt_poses).size(); i++ ) {
@@ -900,10 +970,13 @@ void OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 			}
 		}
 	}
+	return true;
 }
 
 void OffboardControl::check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp) {
     
+	usleep(0.01e6);
+
     visualization_msgs::msg::Marker check_m;
 	// Set the frame, timestamp, and namespace
 	check_m.header.frame_id = "map";
@@ -987,7 +1060,8 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	
 		if( is_last_sp ){
 			_wp_traj_completed = true;
-			RCLCPP_WARN(get_logger(), "Checking path ENDED");
+		
+			RCLCPP_WARN(get_logger(), "Checking path ENDED - Trajectory completed");
 		}
 	}
 	if( !valid_path ) {
@@ -995,12 +1069,14 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 		_replan = true;
 		_stop_trajectory = true;
 		_stop_sp = _position;
+		_stop_att_sp = _attitude;
 		//_first_traj = false;
 	
-		_prev_sp = _position;
-		_prev_att_sp = _attitude;
-		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
-		_status = "REPLAN"; 
+		// _prev_sp = _position;
+		// _prev_att_sp = _attitude;
+		// _prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+
+		//_status = "REPLAN"; 
 	}
 }   
 

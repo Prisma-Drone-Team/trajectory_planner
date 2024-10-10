@@ -34,7 +34,14 @@ class MoveManager : public rclcpp::Node
         
             RCLCPP_INFO(this->get_logger(), "Move Manager node started, ready to send signals");
           
-            _publisher = this->create_publisher<trajectory_planner::msg::MoveCmd>("move_cmd",qos);  // IMPORTANT: check QoS settings
+          	rmw_qos_profile_t cmd_qos_profile = rmw_qos_profile_sensor_data;
+            cmd_qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
+            cmd_qos_profile.durability = RMW_QOS_POLICY_DURABILITY_VOLATILE; 
+            cmd_qos_profile.history = RMW_QOS_POLICY_HISTORY_KEEP_LAST;
+
+            auto cmd_qos = rclcpp::QoS(rclcpp::QoSInitialization(cmd_qos_profile.history, 1), cmd_qos_profile);
+
+            _publisher = this->create_publisher<trajectory_planner::msg::MoveCmd>("move_cmd",cmd_qos);  // IMPORTANT: check QoS settings
 
             _tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
             _static_tf_broadcaster = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
@@ -48,7 +55,7 @@ class MoveManager : public rclcpp::Node
 		    auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
             //_odom_publisher = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
-            if(SIMULATION==1){
+            if(SIMULATION){
                 this->staticTfPub();
                 _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", qos_px4,
                     [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
@@ -78,17 +85,19 @@ class MoveManager : public rclcpp::Node
                 });
             }
 
-            _pdt_sub = this->create_subscription<std_msgs::msg::String>("/seed_pdt_drone/command", qos, std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
+            _pdt_sub = this->create_subscription<std_msgs::msg::String>("/seed_pdt_drone/command", 1, std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
 
             _plan_status_sub = this->create_subscription<std_msgs::msg::String>("/leo/drone/plan_status", 1,
                 [this](const std_msgs::msg::String::UniquePtr msg) {
                     _plan_status = msg->data;
 
-                    if(_plan_status == "REPLAN" || _plan_status == "FAILED"){
+                    if( _plan_status == "FAILED"){
                         std_msgs::msg::String pdt_msg; 
-                        std::vector<std::string> cv = instance2vector(_current_command);  
+                        std::string currentCmd = _current_command;
+                        std::vector<std::string> cv = instance2vector(currentCmd);  
                         pdt_msg.data = cv[1]+".unreachable";
                         _pdt_publisher->publish(pdt_msg);  
+                        //RCLCPP_ERROR(this->get_logger(), "Plan failed,  %s unreachable", pdt_msg.data.c_str());
                     }
 
                 });
@@ -324,24 +333,30 @@ void MoveManager::pdt_input(){
 
     while(rclcpp::ok()) {
 
-     
-        if(_current_command != _received_command) {
+        usleep(0.01e6);
 
-            cmd_to_send = "stop";
-            send_move_cmd(cmd_to_send,sp);
+        if(_current_command != _received_command) {   // update command only if different
+            
+            cv = instance2vector( _received_command);
+            
+            // STOP existing command for overriding it
+            if(_plan_status == "RUNNING"){
+                cmd_to_send = "stop";
+                send_move_cmd(cmd_to_send,sp);
+            } 
 
-            while( _plan_status != "STOPPED" && _plan_status != "IDLE"){
-                usleep(0.1*16);
-                RCLCPP_INFO(this->get_logger(), "Waiting for stop");
+            while( _plan_status != "STOPPED" && _plan_status != "IDLE" && _plan_status != "FAILED" ){
+                usleep(0.1e6);
+                RCLCPP_INFO_ONCE(this->get_logger(), "Waiting for STOPPED or IDLE status");
             }
-
+            
             //start action
             
             cv = instance2vector( _received_command);
 
             RCLCPP_INFO(this->get_logger(),"New command %s", _received_command.c_str() );
 
-            if ( cv[0] == "flyto" ) {
+            if( cv[0] == "flyto" ) {
                 
                 if(checkTransform(cv[1], sp)){
                     _current_command = _received_command;
@@ -353,6 +368,8 @@ void MoveManager::pdt_input(){
             }
             else if ( cv[0] == "takeoff" )
             {   
+                cmd_to_send = "arm";
+                send_move_cmd(cmd_to_send,sp);
                 cmd_to_send = "takeoff";
                 _current_command = _received_command;
                 sp.position.z = 1.5;
@@ -371,18 +388,7 @@ void MoveManager::pdt_input(){
             }
             
         }
-        // if( _current_command == _received_command && _plan_status == "REPLAN"){
-
-        //     if ( cv[0] == "flyto" ) {
-                
-        //         if(checkTransform(cv[1], sp)){
-        //             cmd_to_send = "nav";  
-        //             send_move_cmd(cmd_to_send,sp);
-        //             RCLCPP_INFO(this->get_logger(), "REPLAN: NAV command sent");
-        //         }           
-
-        //     }
-        // }
+        usleep(0.1e6);
                   
     }
 
@@ -417,6 +423,8 @@ void MoveManager::key_input(){
             send_move_cmd(_cmd,sp);
         }
         else if(_cmd == "takeoff") {
+            send_move_cmd("arm",sp);
+            usleep(100*1e6);
             std::cout << "Enter takeoff altitude (ENU frame): "; 
             std::cin >> sp.position.z;
             send_move_cmd(_cmd,sp);
@@ -436,7 +444,7 @@ void MoveManager::key_input(){
         else if(_cmd != "arm" && _cmd != "takeoff" && _cmd != "go" && _cmd != "nav" && _cmd != "land" && _cmd != "term") {
             RCLCPP_ERROR_ONCE(this->get_logger(), "Unknown command");
         }
-
+        usleep(0.1e6);
     }
 
     
