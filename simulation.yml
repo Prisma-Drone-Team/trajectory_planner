@@ -24,13 +24,17 @@ windows:
         - sleep 15
         - cd ~/ros2_ws && source install/setup.bash
         - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/liboctomap.so ros2 run rviz2 rviz2 -d ~/ros2_ws/src/pkg/trajectory_planner/rviz/leo.rviz
+    - shell_command:
+        - sleep 15
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 launch trajectory_planner tf_static_sim.launch.py
 - window_name: rtabmap
   layout: tiled
   panes:
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner tf_static_sim.launch.py
+        - ros2 run trajectory_planner offboard_control
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
@@ -38,7 +42,7 @@ windows:
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 run trajectory_planner offboard_control
+        - ros2 topic echo /leo/drone/plan_status
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash

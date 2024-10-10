@@ -290,13 +290,14 @@ void OffboardControl::move_cmd(){
 	while(rclcpp::ok()) {
 
 		// Dummy state machine
-		if((_status == "RUNNING" && _replan == true && _stop_trajectory) || (_status == "REPLAN" && _replan_cnt < 5 && _stop_trajectory)){
-			_status = "REPLAN"; 
+		//if((_status == "RUNNING" && _replan == true && _stop_trajectory) || (_status == "REPLAN" && _replan_cnt < 5 && _stop_trajectory)){
+		if(_status == "RUNNING" && _replan == true && _stop_trajectory  && _replan_cnt < 5){
+			//_status = "REPLAN"; 
 			_prev_sp = _stop_sp; 
 			_prev_att_sp = _stop_att_sp;
 			_prev_yaw_sp = matrix::Eulerf(_prev_att_sp).psi();
 		}
-		else if(_status == "REPLAN" && _replan_cnt >= 5 || plan_has_result == false){
+		else if(_status == "RUNNING" && _replan_cnt >= 5 || plan_has_result == false){
 			_status = "FAILED";
 		}
 		else if(_stop_trajectory){_status = "STOPPED";}
@@ -304,19 +305,27 @@ void OffboardControl::move_cmd(){
 		//else{_status = "RUNNING";}
 
 		
-		if(cmd != _cmd || _cmd_sp != current_sp || _status=="REPLAN") {  // New command-setpoint or REPLAN
+		//if(cmd != _cmd || _cmd_sp != current_sp || _status=="REPLAN") {  // New command-setpoint or REPLAN
+		if(cmd != _cmd || _cmd_sp != current_sp || _replan_cnt > 0) {
 
 			RCLCPP_INFO(get_logger(), "Command received: %s. Pose: %f,%f,%f",cmd.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
+
+			if(cmd == _cmd && _cmd_sp == current_sp){ 
+				_replan_cnt++;
+			}else{
+				_replan_cnt = 0;
+			}
+
 			cmd = _cmd;
 			current_sp = _cmd_sp;
 			sp = current_sp;
 
-			if(_status == "REPLAN") {
-				_replan_cnt++;
-			}else{
-				_replan_cnt = 0;
-				_status = "RUNNING";
-			}
+			// if(_status == "REPLAN") {
+			// 	_replan_cnt++;
+			// }else{
+			// 	_replan_cnt = 0;
+			// 	_status = "RUNNING";
+			// }
 
 			if(cmd =="nav"){			
 
