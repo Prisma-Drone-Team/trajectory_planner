@@ -1,7 +1,7 @@
 session_name: simulation
 socket_name: drone
 environment:
-  ROS_DOMAIN_ID: "77"
+  ROS_DOMAIN_ID: "78"
 pre_window: 
 windows:
 - window_name: px4
@@ -21,11 +21,15 @@ windows:
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 launch trajectory_planner rtabmap_sim.launch.py
     - shell_command:
-        - sleep 15
+        - sleep 5  
+        - cd ~/ros2_ws && source install/setup.bash
+        #- ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
+    - shell_command:
+        - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
         - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/liboctomap.so ros2 run rviz2 rviz2 -d ~/ros2_ws/src/pkg/trajectory_planner/rviz/leo.rviz
     - shell_command:
-        - sleep 15
+        - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 launch trajectory_planner tf_static_sim.launch.py
 - window_name: rtabmap
@@ -34,16 +38,20 @@ windows:
     - shell_command:
         - sleep 25
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 run trajectory_planner offboard_control
+        - ros2 run trajectory_planner offboard_control --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
     - shell_command:
-        - sleep 25
+        - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 run trajectory_planner move_manager_node
     - shell_command:
-        - sleep 25
+        - sleep 30
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 topic echo /leo/drone/plan_status
     - shell_command:
-        - sleep 25
+        - sleep 5
+        - cd ~/ros2_ws && source install/setup.bash
+        - ros2 run plotjuggler plotjuggler
+    - shell_command:
+        - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" 

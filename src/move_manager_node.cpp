@@ -93,10 +93,13 @@ class MoveManager : public rclcpp::Node
 
                     if( _plan_status == "FAILED"){
                         std_msgs::msg::String pdt_msg; 
-                        std::string currentCmd = _current_command;
-                        std::vector<std::string> cv = instance2vector(currentCmd);  
-                        pdt_msg.data = cv[1]+".unreachable";
-                        _pdt_publisher->publish(pdt_msg);  
+
+                        if (_current_command.substr(0, 5) == "flyto"){
+                            std::vector<std::string> cv = instance2vector(_current_command);  
+                            pdt_msg.data = cv[1]+".unreachable";
+                            _pdt_publisher->publish(pdt_msg);  
+                        } 
+
                         //RCLCPP_ERROR(this->get_logger(), "Plan failed,  %s unreachable", pdt_msg.data.c_str());
                     }
 
@@ -336,8 +339,7 @@ void MoveManager::pdt_input(){
         usleep(0.01e6);
 
         if(_current_command != _received_command) {   // update command only if different
-            std::cout<<_current_command<<std::endl;
-            std::cout<<_received_command<<std::endl;
+
             cv = instance2vector( _received_command);
             
             // STOP existing command for overriding it
@@ -424,8 +426,6 @@ void MoveManager::key_input(){
             send_move_cmd(_cmd,sp);
         }
         else if(_cmd == "takeoff") {
-            send_move_cmd("arm",sp);
-            usleep(100*1e6);
             std::cout << "Enter takeoff altitude (ENU frame): "; 
             std::cin >> sp.position.z;
             send_move_cmd(_cmd,sp);

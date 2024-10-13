@@ -123,15 +123,15 @@ public:
 
 private:
 
-	void timer_callback();
+	void offboard_callback();
 	void status_update();
 	void status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg); 
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 	void check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
+	//void check_trajectory(const CARTESIAN_PLANNER & trajectory );
 	
 	bool _first_odom{false};
-	bool _first_traj{false};
 
 	rclcpp::TimerBase::SharedPtr _timer;
 	rclcpp::TimerBase::SharedPtr _check_timer;
@@ -142,9 +142,10 @@ private:
 	float _timer_freq{100.0f};
 
 	CARTESIAN_PLANNER _trajectory{_timer_freq};
-	void holdTraj();
-	void startTraj(matrix::Vector3f pos, float yaw, double d);
-	void startWPTraj(std::shared_ptr<std::vector<POSE>> opt_poses);
+	void stop_traj();
+	void compute_time_and_heading(const matrix::Vector3f & sp, float & yaw_d, float & yaw_time, float & duration);
+	void start_traj(matrix::Vector3f pos, float yaw, double d);
+	void start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses, CARTESIAN_PLANNER & trajectory);
 	bool plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
@@ -157,7 +158,7 @@ private:
 
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
-	 rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _px4_vehicle_status_sub;
+	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _px4_vehicle_status_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
 
@@ -228,7 +229,10 @@ private:
 	matrix::Vector3f _cmd_sp;
 	bool _new_cmd{false};
 	bool _replan{false};
+	bool _plan_has_result{true};
 	bool _armed{false};
+	bool _new_command{false};
+	int _max_replan_iterations{5};
 	std::string _status="IDLE";
 
 };
