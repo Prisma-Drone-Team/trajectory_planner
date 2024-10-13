@@ -28,7 +28,8 @@ public:
 	void set_waypoints(std::vector<double> points, std::vector<double> times, double xdi = 0, double xdf = 0, double xddi = 0, double xddf = 0);
 	bool isReady() { return _ready; };
 	bool getNext(double &x, double &xd, double &xdd);
-
+	
+	
 	std::vector<double> _x;
 	std::vector<double> _xd;
 	std::vector<double> _xdd;
@@ -64,9 +65,11 @@ public:
 		_last_xdd.accel.angular.x = _last_xdd.accel.angular.y = _last_xdd.accel.angular.z = 0.0f;
 	};
 	void compute();
+	void clear_waypoints();
 	void set_waypoints(std::vector<geometry_msgs::msg::PoseStamped> poses, std::vector<double> times);
 	void set_waypoints(std::vector<geometry_msgs::msg::PoseStamped> poses, std::vector<double> times, Eigen::VectorXd xdi, Eigen::VectorXd xdf, Eigen::VectorXd xddi, Eigen::VectorXd xddf);
 	bool isReady() { return _ready; };
+	int getCounter(){return _counter;};
 	bool getNext(geometry_msgs::msg::PoseStamped &x, geometry_msgs::msg::TwistStamped &xd, geometry_msgs::msg::AccelStamped &xdd);
 	std::vector<geometry_msgs::msg::PoseStamped> _x;
 	std::vector<geometry_msgs::msg::TwistStamped> _xd;

@@ -22,6 +22,7 @@ def generate_launch_description():
           'map_frame_id':'map',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
+          'odom_frame_id': 'odom',
           'approx_sync':True,
           'qos_image':2,
           'qos':2,

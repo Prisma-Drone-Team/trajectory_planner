@@ -285,6 +285,24 @@ void CARTESIAN_PLANNER::set_waypoints(std::vector<geometry_msgs::msg::PoseStampe
 	_xddf = Eigen::VectorXd::Zero(6);
 }
 
+void CARTESIAN_PLANNER::clear_waypoints(){
+	
+	_ready = false;
+	_counter = 0;
+	_poses.clear();
+	_times.clear();
+	_t.clear();
+	_x.clear();
+	_xd.clear();
+	_xdd.clear();
+	_N = 0;
+
+	_xdi = Eigen::VectorXd::Zero(6);
+	_xdf = Eigen::VectorXd::Zero(6);
+	_xddi = Eigen::VectorXd::Zero(6);
+	_xddf = Eigen::VectorXd::Zero(6);
+}
+
 void CARTESIAN_PLANNER::set_waypoints(std::vector<geometry_msgs::msg::PoseStamped> poses, std::vector<double> times, Eigen::VectorXd xdi, Eigen::VectorXd xdf, Eigen::VectorXd xddi, Eigen::VectorXd xddf)
 {
 	set_waypoints(poses, times);

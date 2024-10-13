@@ -57,9 +57,25 @@ Visualization Manager:
           Value: true
         base_link_FRD:
           Value: true
+        goal1:
+          Value: true
+        goal2:
+          Value: true
+        goal3:
+          Value: true
+        goal4:
+          Value: true
+        goal5:
+          Value: true
+        goal6:
+          Value: true
+        goal7:
+          Value: true
         map:
           Value: true
         odom:
+          Value: true
+        odomNED:
           Value: true
         x500_depth_0/OakD-Lite/base_link/IMX214:
           Value: true
@@ -72,27 +88,28 @@ Visualization Manager:
       Show Names: false
       Tree:
         map:
-          odom:
+          goal1:
             {}
+          goal2:
+            {}
+          goal3:
+            {}
+          goal4:
+            {}
+          goal5:
+            {}
+          goal6:
+            {}
+          goal7:
+            {}
+          odom:
+            odomNED:
+              base_link_FRD:
+                base_link:
+                  x500_depth_0/OakD-Lite/base_link/IMX214:
+                    {}
       Update Interval: 0
       Value: true
-    - Class: octomap_rviz_plugins/ColorOccupancyGrid
-      Enabled: true
-      Max. Height Display: 3.4028234663852886e+38
-      Max. Octree Depth: 16
-      Min. Height Display: -3.4028234663852886e+38
-      Name: ColorOccupancyGrid
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /octomap_binary
-      Value: true
-      Voxel Alpha: 1
-      Voxel Coloring: Z-Axis
-      Voxel Rendering: Occupied Voxels
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -134,6 +151,23 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /leo/drone/check_path
       Value: true
+    - Class: octomap_rviz_plugins/ColorOccupancyGrid
+      Enabled: true
+      Max. Height Display: inf
+      Max. Octree Depth: 16
+      Min. Height Display: -inf
+      Name: ColorOccupancyGrid
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /octomap_full
+      Value: true
+      Voxel Alpha: 1
+      Voxel Coloring: Z-Axis
+      Voxel Rendering: Occupied Voxels
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -180,7 +214,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 9.436324119567871
+      Distance: 13.257355690002441
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
