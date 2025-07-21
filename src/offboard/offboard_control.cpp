@@ -7,81 +7,30 @@
 #define SIMULATION 1
 
 
-OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED), _first_odom(true) {
+OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
 	_offboard_control_mode_publisher =
 		this->create_publisher<OffboardControlMode>("fmu/in/offboard_control_mode", 10);
-	// _trajectory_setpoint_publisher =
-	// 	this->create_publisher<TrajectorySetpoint>("fmu/in/trajectory_setpoint", 10);
+
 	_vehicle_command_publisher =
 		this->create_publisher<VehicleCommand>("fmu/in/vehicle_command", 10);
 	
 	_trajectory_setpoint_publisher =
-		this->create_publisher<trajectory_msgs::msg::MultiDOFJointTrajectory>("px4/trajectory_setpoint_enu", 10);
+		this->create_publisher<trajectory_msgs::msg::MultiDOFJointTrajectoryPoint>("/px4/trajectory_setpoint_enu", 10);
 	
 	/*Visualization*/
 	_path_publisher = this->create_publisher<nav_msgs::msg::Path>("rrt/path", 1);
 	_check_path_pub = this->create_publisher<visualization_msgs::msg::Marker>("/leo/drone/check_path", 1);
 
-	// Set up a reliable QoS profile
-	// rclcpp::QoS qos_profile(10);
-	// qos_profile.reliable(); // Set reliability to reliable
-	// qos_profile.keep_last(1); // Keep only the last message
 	_plan_state_publisher = this->create_publisher<std_msgs::msg::String>("/leo/drone/plan_status", 1);
 
 
 	rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 	auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
-	// // get common timestamp
-	// _timesync_sub =
-	// 	this->create_subscription<px4_msgs::msg::TimesyncStatus>("/fmu/out/timesync_status", qos,
-	// 		[this](const px4_msgs::msg::TimesyncStatus::UniquePtr msg) {
-	// 			_timestamp.store(msg->timestamp);
-	// 		});
-
-	// _odom_sub =
-	// 	this->create_subscription<px4_msgs::msg::VehicleOdometry>("fmu/out/vehicle_odometry", qos,
-	// 		[this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
-				
-				
-	// 			_attitude = matrix::Quaternionf(msg->q.data()[0], msg->q.data()[1], msg->q.data()[2], msg->q.data()[3]);
-	// 			_position = matrix::Vector3f(msg->position[0], msg->position[1], msg->position[2]);
-	// 			if(isnanf(_position(0)) || 
-	// 					isnanf(_position(1)) ||
-	// 					isnanf(_position(2))) {
-	// 				RCLCPP_WARN(rclcpp::get_logger("OFFBOARD"), "INVALID POSITION: %10.5f, %10.5f, %10.5f",
-	// 					_position(0), _position(1), _position(2));
-	// 			}
-
-	// 			if(!_first_odom){
-	// 				_x.pose.position.x = _position(0);
-	// 				_x.pose.position.y = _position(1);
-	// 				_x.pose.position.z = _position(2);
-	// 				_x.pose.orientation.x = _attitude(1); 
-	// 				_x.pose.orientation.y = _attitude(2);
-	// 				_x.pose.orientation.z = _attitude(3);
-	// 				_x.pose.orientation.w = _attitude(0);
-	// 				_prev_sp = _position;
-	// 				_prev_att_sp = _attitude;
-	// 				_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
-	// 				std::cout << "------------------- Yaw: " << _prev_yaw_sp << std::endl;
-
-	// 				_trajectory._last_x.pose.position.x = _position(0);
-	// 				_trajectory._last_x.pose.position.y = _position(1);
-	// 				_trajectory._last_x.pose.position.z = _position(2);
-	// 				_trajectory._last_x.pose.orientation.x = _attitude(1); 
-	// 				_trajectory._last_x.pose.orientation.y = _attitude(2);
-	// 				_trajectory._last_x.pose.orientation.z = _attitude(3);
-	// 				_trajectory._last_x.pose.orientation.w = _attitude(0);
-	// 			}
-
-	// 			_first_odom = true;
-	// 		});
-
-	_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/px4/odom/out", qos,
+	_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/px4/odometry/out", qos,
 				[this](const nav_msgs::msg::Odometry::UniquePtr msg) {
-			// Estrazione attitude (quaternione)
+			
 			_attitude = matrix::Quaternionf(
 				msg->pose.pose.orientation.w,
 				msg->pose.pose.orientation.x,
@@ -89,32 +38,31 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				msg->pose.pose.orientation.z
 			);
 
-			// Estrazione posizione
+			
 			_position = matrix::Vector3f(
 				msg->pose.pose.position.x,
 				msg->pose.pose.position.y,
 				msg->pose.pose.position.z
 			);
 
-			// Controllo valori NaN nella posizione
+			
 			if (std::isnan(_position(0)) || std::isnan(_position(1)) || std::isnan(_position(2))) {
 				RCLCPP_WARN(
 					this->get_logger(), 
 					"INVALID POSITION: %.5f, %.5f, %.5f",
 					_position(0), _position(1), _position(2)
 				);
-				return;  // Esci dalla callback se la posizione non è valida
+				return;  
 			}
 
-			// Inizializzazione al primo messaggio valido
+			
 			if (!_first_odom) {
-				// Aggiornamento stato corrente
+				
 				_x.pose.position.x = _position(0);
 				_x.pose.position.y = _position(1);
 				_x.pose.position.z = _position(2);
-				_x.pose.orientation = msg->pose.pose.orientation;  // Uso diretto del quaternione
+				_x.pose.orientation = msg->pose.pose.orientation;  
 
-				// Salvataggio stato precedente
 				_prev_sp = _position;
 				_prev_att_sp = _attitude;
 				_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
@@ -125,7 +73,6 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 					_prev_yaw_sp
 				);
 
-				// Aggiornamento ultima posizione nota per la traiettoria
 				_trajectory._last_x.pose = msg->pose.pose;
 			}
 
@@ -328,7 +275,7 @@ void OffboardControl::offboard_callback() {
 	publish_offboard_control_mode();
 	publish_trajectory_setpoint();
 
-	// stop the counter after reaching 101
+	// stop the counter after reaching 11
 	if (_offboard_setpoint_counter < 11) {
 		_offboard_setpoint_counter++;
 	}
@@ -416,7 +363,6 @@ void OffboardControl::move_cmd(){
 								sp(1) = (*opt_poses)[wp_index].position.y;
 								sp(2) = (*opt_poses)[wp_index].position.z;    
 								
-								// sp = _T_enu_to_ned*sp;
 								geometry_msgs::msg::PointStamped point_in, point_out;
 								point_in.header.stamp = this->get_clock()->now();
 								point_in.header.frame_id = "map";
@@ -535,7 +481,6 @@ void OffboardControl::key_input() {
 			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> sp(2);
 			
-			// sp = _T_enu_to_ned*sp;
 			geometry_msgs::msg::PointStamped point_in, point_out;
 			point_in.header.stamp = this->get_clock()->now();
 			point_in.header.frame_id = "map";
@@ -664,7 +609,6 @@ void OffboardControl::key_input() {
 						sp(1) = (*opt_poses)[wp_index].position.y;
 						sp(2) = (*opt_poses)[wp_index].position.z;    
 						
-						// sp = _T_enu_to_ned*sp;
 						// Transform point from map frame to odom frame
 						geometry_msgs::msg::PointStamped point_in, point_out;
 						point_in.header.stamp = this->get_clock()->now();
@@ -705,7 +649,6 @@ void OffboardControl::key_input() {
 			sp = _position;
 			std::cout << "Enter takeoff altitude (ENU frame): "; 
 			std::cin >> sp(2);
-			// sp(2) = -sp(2);
 			
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
@@ -791,31 +734,7 @@ void OffboardControl::publish_offboard_control_mode() {
 }
 
 void OffboardControl::publish_trajectory_setpoint() {
-	// TrajectorySetpoint msg{};
-	// rclcpp::Time now = this->get_clock()->now();
 
-	// msg.timestamp = now.nanoseconds() / 1000.0;
-
-
-	// msg.position[0] = _x.pose.position.x;
-	// msg.position[1] = _x.pose.position.y;
-	// msg.position[2] = _x.pose.position.z;
-
-	// msg.velocity[0] = _xd.twist.linear.x;
-	// msg.velocity[1] = _xd.twist.linear.y;
-	// msg.velocity[2] = _xd.twist.linear.z;
-
-	// msg.acceleration[0] = _xdd.accel.linear.x;
-	// msg.acceleration[1] = _xdd.accel.linear.y;
-	// msg.acceleration[2] = _xdd.accel.linear.z;
-
-	// matrix::Quaternionf des_att(_x.pose.orientation.w, _x.pose.orientation.x, _x.pose.orientation.y, _x.pose.orientation.z);
-	// msg.yaw = matrix::Eulerf(des_att).psi();
-	
-	// if (isnanf(msg.position[0]) || isnanf(msg.position[1]) || isnanf(msg.position[2]))
-	// 	RCLCPP_INFO(this->get_logger(),"NAN in trajectory setpoint");
-
-	// _trajectory_setpoint_publisher->publish(msg);
 	rclcpp::Time now = this->get_clock()->now();
 
 	geometry_msgs::msg::Transform transform;
@@ -846,18 +765,14 @@ void OffboardControl::publish_trajectory_setpoint() {
 	if (isnanf(transform.translation.x) || isnanf(transform.translation.y) || isnanf(transform.translation.z))
 		RCLCPP_INFO(this->get_logger(),"NAN in trajectory setpoint");
 
-	trajectory_msgs::msg::MultiDOFJointTrajectoryPoint point;
-	point.transforms.push_back(transform);
-	point.velocities.push_back(velocity);
-	point.accelerations.push_back(acceleration);
-	point.time_from_start = rclcpp::Duration::from_seconds(0.0);
+	trajectory_msgs::msg::MultiDOFJointTrajectoryPoint traj_pt;
+	traj_pt.transforms.push_back(transform);
+	traj_pt.velocities.push_back(velocity);
+	traj_pt.accelerations.push_back(acceleration);
+	traj_pt.time_from_start = this->get_clock()->now().nanoseconds() / 1000;;
+	
 
-	trajectory_msgs::msg::MultiDOFJointTrajectory traj_msg;
-	traj_msg.header.stamp = now;
-	traj_msg.header.frame_id = "odom";
-	traj_msg.points.push_back(point);
-
-	_trajectory_setpoint_publisher->publish(traj_msg);
+	_trajectory_setpoint_publisher->publish(traj_pt);
 }
 
 void OffboardControl::publish_vehicle_command(uint16_t command, float param1, float param2) {
@@ -915,9 +830,7 @@ void OffboardControl::start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses
 		sp(0) = (*opt_poses)[i].position.x;
 		sp(1) = (*opt_poses)[i].position.y;
 		sp(2) = (*opt_poses)[i].position.z; 
-		
-		// sp = _T_enu_to_ned*sp;
-		
+				
 		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
 		point_in.header.frame_id = "map";
@@ -1058,7 +971,6 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
 	}
 
-	// matrix::Vector3f prev_sp = _T_enu_to_ned*_prev_sp; 
 	matrix::Vector3f prev_sp;
 	geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
@@ -1213,16 +1125,6 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
 
 		if(*wp != 0){
-			// // if(SIMULATION ==1)
-			// // 	pt_i << _x.pose.position.y, _x.pose.position.x, -_x.pose.position.z; 
-			// // else
-			// // 	pt_i << _x.pose.position.x, -_x.pose.position.y, -_x.pose.position.z;
-
-			// #ifdef SIMULATION
-			// 	pt_i << _position(1), _position(0), -_position(2); 
-			// #else
-			// 	pt_i << _position(0), -_position(1),- _position(2);
-			// #endif
 			
 			pt_i << _position(0), _position(1), _position(2); 
 

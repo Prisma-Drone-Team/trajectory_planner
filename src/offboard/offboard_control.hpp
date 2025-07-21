@@ -1,54 +1,6 @@
-/****************************************************************************
- *
- * Copyright 2020 PX4 Development Team. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its contributors
- * may be used to endorse or promote products derived from this software without
- * specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- ****************************************************************************/
-
-/**
- * @brief Offboard control example
- * @file offboard_control.cpp
- * @addtogroup examples
- * @author Mickey Cowden <info@cowden.tech>
- * @author Nuno Marques <nuno.marques@dronesolutions.io>
-
- * The TrajectorySetpoint message and the OFFBOARD mode in general are under an ongoing update.
- * Please refer to PR: https://github.com/PX4/PX4-Autopilot/pull/16739 for more info. 
- * As per PR: https://github.com/PX4/PX4-Autopilot/pull/17094, the format
- * of the TrajectorySetpoint message shall change.
- */
-
 #pragma once
 
-// #include <px4_msgs/msg/vehicle_odometry.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
-// #include <px4_msgs/msg/trajectory_setpoint.hpp>
-// #include <px4_msgs/msg/timesync_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 // #include <px4_msgs/msg/vehicle_status.hpp>
@@ -88,7 +40,7 @@
 #include <tf2_ros/buffer.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
-#include <trajectory_msgs/msg/multi_dof_joint_trajectory.hpp>
+#include <trajectory_msgs/msg/multi_dof_joint_trajectory_point.hpp>
 
 // Custom messages
 #include "trajectory_planner/msg/move_cmd.hpp"
@@ -138,7 +90,6 @@ private:
 	void move_command_callback(const trajectory_planner::msg::MoveCmd::SharedPtr msg);
 	void octomap_callback( const octomap_msgs::msg::Octomap::SharedPtr octo_msg );
 	void check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp );
-	//void check_trajectory(const CARTESIAN_PLANNER & trajectory );
 	void tf_lookup_loop();
 	bool _first_odom{false};
 
@@ -158,16 +109,13 @@ private:
 	bool plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
-	// rclcpp::Publisher<TrajectorySetpoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr _vehicle_command_publisher;
-	rclcpp::Publisher<trajectory_msgs::msg::MultiDOFJointTrajectory>::SharedPtr _trajectory_setpoint_publisher;
+	rclcpp::Publisher<trajectory_msgs::msg::MultiDOFJointTrajectoryPoint>::SharedPtr _trajectory_setpoint_publisher;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _check_path_pub;
 	
 	rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _plan_state_publisher;
 
-	// rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr _timesync_sub;
-	// rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
 	// rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _px4_vehicle_status_sub;
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
@@ -213,7 +161,6 @@ private:
 	
 
 	NodeState _state;
-	// TrajectorySetpoint _current_setpoint_msg;
 	matrix::Vector3f _goal{};
 	matrix::Vector3f _starting_point{};
 	float _starting_yaw{};
