@@ -31,3 +31,4 @@ offboard_control:
 
     max_yaw_rate: 0.2
     max_velocity: 0.3
+    use_key_input: 1.0 # BOOL

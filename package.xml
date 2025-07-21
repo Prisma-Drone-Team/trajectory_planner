@@ -21,6 +21,7 @@
   <depend>sensor_msgs</depend>
   <depend>octomap_msgs</depend>
   <depend>octomap</depend>
+  <depend>nav_msgs</depend>
 
   <depend>launch</depend>
   <depend>launch_testing</depend>

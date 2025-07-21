@@ -24,10 +24,13 @@ In a third terminal run the trajectory planner node
 
        $ ros2 run trajectory_planner offboard_control 
 
-To include params
+To include params use one of the following commands:
 
-       $ ros2 run trajectory_planner offboard_control --ros-args --params-file <path_to_param_file> 
-       $ ros2 run trajectory_planner offboard_control --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/params.yaml
+       - For simulation:
+              $ ros2 run trajectory_planner offboard_control --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
+
+       - For real environment:
+              $ ros2 run trajectory_planner offboard_control --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/params.yaml
 
 
 ## Features
