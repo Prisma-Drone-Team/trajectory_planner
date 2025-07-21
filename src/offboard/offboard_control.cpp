@@ -1213,16 +1213,18 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
 
 		if(*wp != 0){
-			// if(SIMULATION ==1)
-			// 	pt_i << _x.pose.position.y, _x.pose.position.x, -_x.pose.position.z; 
-			// else
-			// 	pt_i << _x.pose.position.x, -_x.pose.position.y, -_x.pose.position.z;
+			// // if(SIMULATION ==1)
+			// // 	pt_i << _x.pose.position.y, _x.pose.position.x, -_x.pose.position.z; 
+			// // else
+			// // 	pt_i << _x.pose.position.x, -_x.pose.position.y, -_x.pose.position.z;
 
-			#ifdef SIMULATION
-				pt_i << _position(1), _position(0), -_position(2); 
-			#else
-				pt_i << _position(0), -_position(1),- _position(2);
-			#endif
+			// #ifdef SIMULATION
+			// 	pt_i << _position(1), _position(0), -_position(2); 
+			// #else
+			// 	pt_i << _position(0), -_position(1),- _position(2);
+			// #endif
+			
+			pt_i << _position(0), _position(1), _position(2); 
 
 			for(int i=*wp ; i<poses.size(); i++ ) {
 				//RCLCPP_WARN(get_logger(), "Checking wp %f", i);
