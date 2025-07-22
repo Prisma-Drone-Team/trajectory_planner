@@ -18,15 +18,16 @@ def generate_launch_description():
         )
 
     # Define the offboard node
-    offboard_node = Node(
+    offboard_control = Node(
         package='trajectory_planner',
-        executable='offboard_node',
-        name='offboard_node',
+        executable='offboard_control',
+        name='offboard_control',
         output='screen',
+        emulate_tty=True,
         parameters=[config]
     )
 
     return LaunchDescription([
         offboard_launch_file,
-        offboard_node,
+        offboard_control,
     ])

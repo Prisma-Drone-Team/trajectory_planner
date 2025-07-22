@@ -390,7 +390,7 @@ void OffboardControl::move_cmd(){
 
 				sp(0) = _position(0);
 				sp(1) = _position(1);
-				sp(2) = -current_sp(2);
+				sp(2) = current_sp(2);
 			
 				yaw_d = matrix::Eulerf(_attitude).psi(); 
 				yaw_d = _prev_yaw_sp; 
@@ -408,7 +408,7 @@ void OffboardControl::move_cmd(){
 				RCLCPP_INFO(this->get_logger(),"LAND command received");
 				sp(0) = _position(0);
 				sp(1) = _position(1);
-				sp(2) = 0.5; 
+				sp(2) = -0.5; 
 				current_sp = sp;
 				_replan = false;
 				_stop_trajectory = false; 
