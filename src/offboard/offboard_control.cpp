@@ -209,7 +209,7 @@ void OffboardControl::tf_lookup_loop() {
 	rclcpp::Rate rate(100);
 	while (rclcpp::ok()) {
 		try {
-			_tf_map_odom = tf_buffer_->lookupTransform("map", "odom", tf2::TimePointZero);
+			_tf_map_odom = tf_buffer_->lookupTransform("odom", "map", tf2::TimePointZero);
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
 		}
