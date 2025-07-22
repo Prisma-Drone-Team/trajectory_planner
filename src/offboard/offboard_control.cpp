@@ -652,7 +652,7 @@ void OffboardControl::key_input() {
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
 			sp = _prev_sp;
-			sp(2) = 0.5; 
+			sp(2) = -0.5; 
 			_stop_trajectory = false; 
 			yaw_d = _prev_yaw_sp; 
 			start_traj(sp, yaw_d, 15);	 // TODO tune time
