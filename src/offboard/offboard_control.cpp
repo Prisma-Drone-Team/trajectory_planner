@@ -203,32 +203,19 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	#endif
 }
 
-void OffboardControl::tf_lookup_loop()  {
-    RCLCPP_INFO(this->get_logger(), "TF lookup thread started");
-	rclcpp::Rate rate(50);
-    while (rclcpp::ok())    {
-		try
-		{
-		_tf_map_odom =
-			tf_buffer_->lookupTransform("map", "odom", tf2::TimePointZero);
-		}
-		catch (const tf2::TransformException &ex)
-		{
-		RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
-		}
+void OffboardControl::tf_lookup_loop() {
+	RCLCPP_INFO(this->get_logger(), "TF lookup thread started");
 
-		try
-		{
-		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
-		}
-		catch (boost::thread_interrupted &)
-		{
-		RCLCPP_INFO(this->get_logger(), "TF lookup thread interrupted");
-		break;
+	rclcpp::Rate rate(100);
+	while (rclcpp::ok()) {
+		try {
+			_tf_map_odom = tf_buffer_->lookupTransform("map", "odom", tf2::TimePointZero);
+		} catch (const tf2::TransformException &ex) {
+			RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
 		}
 		rate.sleep();
-    }
-  }
+	}
+}
 
 // void OffboardControl::status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg){
 // 	_armed = (msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED);
