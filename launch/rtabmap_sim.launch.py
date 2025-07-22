@@ -26,7 +26,6 @@ def generate_launch_description():
           'approx_sync':True,
           'qos_image':2,
           'qos':2,
-          'publish_odom': True
           }]
 
     remappings=[
