@@ -769,8 +769,7 @@ void OffboardControl::publish_trajectory_setpoint() {
 	traj_pt.transforms.push_back(transform);
 	traj_pt.velocities.push_back(velocity);
 	traj_pt.accelerations.push_back(acceleration);
-	traj_pt.time_from_start = this->get_clock()->now().nanoseconds() / 1000;;
-	
+	traj_pt.time_from_start = rclcpp::Duration::from_seconds(0.0);
 
 	_trajectory_setpoint_publisher->publish(traj_pt);
 }
