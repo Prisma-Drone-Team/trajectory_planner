@@ -9,28 +9,71 @@
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
 
+	this->declare_parameter("offboard_control_mode_topic", "fmu/in/offboard_control_mode");
+	_offboard_control_mode_topic = this->get_parameter("offboard_control_mode_topic").as_string();
+	RCLCPP_INFO(get_logger(), "offboard_control_mode_topic: %s", _offboard_control_mode_topic.c_str());
+
+	this->declare_parameter("vehicle_command_topic", "fmu/in/vehicle_command");
+	_vehicle_command_topic = this->get_parameter("vehicle_command_topic").as_string();
+	RCLCPP_INFO(get_logger(), "vehicle_command_topic: %s", _vehicle_command_topic.c_str());
+
+	this->declare_parameter("trajectory_setpoint_topic", "/px4/trajectory_setpoint_enu");
+	_trajectory_setpoint_topic = this->get_parameter("trajectory_setpoint_topic").as_string();
+	RCLCPP_INFO(get_logger(), "trajectory_setpoint_topic: %s", _trajectory_setpoint_topic.c_str());
+
+	this->declare_parameter("odom_topic", "/px4/odometry/out");
+	_odom_topic = this->get_parameter("odom_topic").as_string();
+	RCLCPP_INFO(get_logger(), "odom_topic: %s", _odom_topic.c_str());
+
+	this->declare_parameter("octomap_topic", "/octomap_binary");
+	_octomap_topic = this->get_parameter("octomap_topic").as_string();
+	RCLCPP_INFO(get_logger(), "octomap_topic: %s", _octomap_topic.c_str());
+
+	this->declare_parameter("move_cmd_topic", "move_cmd");
+	_move_cmd_topic = this->get_parameter("move_cmd_topic").as_string();
+	RCLCPP_INFO(get_logger(), "move_cmd_topic: %s", _move_cmd_topic.c_str());
+
+	this->declare_parameter("path_topic", "rrt/path");
+	_path_topic = this->get_parameter("path_topic").as_string();
+	RCLCPP_INFO(get_logger(), "path_topic: %s", _path_topic.c_str());
+
+	this->declare_parameter("check_path_topic", "/leo/drone/check_path");
+	_check_path_topic = this->get_parameter("check_path_topic").as_string();
+	RCLCPP_INFO(get_logger(), "check_path_topic: %s", _check_path_topic.c_str());
+
+	this->declare_parameter("plan_status_topic", "/leo/drone/plan_status");
+	_plan_status_topic = this->get_parameter("plan_status_topic").as_string();
+	RCLCPP_INFO(get_logger(), "plan_status_topic: %s", _plan_status_topic.c_str());
+
+
+	this->declare_parameter("parent_transform", "map");
+	_parent_transf = this->get_parameter("parent_transform").as_string();
+	RCLCPP_INFO(get_logger(), "parent_transform: %s", _parent_transf.c_str());
+
+	this->declare_parameter("child_transform", "odom");
+	_child_transf = this->get_parameter("child_transform").as_string();
+	RCLCPP_INFO(get_logger(), "child_transform: %s", _child_transf.c_str());
+
 	_offboard_control_mode_publisher =
-		this->create_publisher<OffboardControlMode>("fmu/in/offboard_control_mode", 10);
+		this->create_publisher<OffboardControlMode>(_offboard_control_mode_topic, 10);
 
 	_vehicle_command_publisher =
-		this->create_publisher<VehicleCommand>("fmu/in/vehicle_command", 10);
+		this->create_publisher<VehicleCommand>(_vehicle_command_topic, 10);
 	
 	_trajectory_setpoint_publisher =
-		this->create_publisher<trajectory_msgs::msg::MultiDOFJointTrajectoryPoint>("/px4/trajectory_setpoint_enu", 10);
+		this->create_publisher<trajectory_msgs::msg::MultiDOFJointTrajectoryPoint>(_trajectory_setpoint_topic, 10);
 	
 	/*Visualization*/
-	_path_publisher = this->create_publisher<nav_msgs::msg::Path>("rrt/path", 1);
-	_check_path_pub = this->create_publisher<visualization_msgs::msg::Marker>("/leo/drone/check_path", 1);
-
-	_plan_state_publisher = this->create_publisher<std_msgs::msg::String>("/leo/drone/plan_status", 1);
-
+	_path_publisher = this->create_publisher<nav_msgs::msg::Path>(_path_topic, 1);
+	_check_path_pub = this->create_publisher<visualization_msgs::msg::Marker>(_check_path_topic, 1);
+	_plan_state_publisher = this->create_publisher<std_msgs::msg::String>(_plan_status_topic, 1);
 
 	rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 	auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
-	_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/px4/odometry/out", qos,
+	_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(_odom_topic, qos,
 				[this](const nav_msgs::msg::Odometry::UniquePtr msg) {
-			
+
 			_attitude = matrix::Quaternionf(
 				msg->pose.pose.orientation.w,
 				msg->pose.pose.orientation.x,
@@ -38,14 +81,12 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				msg->pose.pose.orientation.z
 			);
 
-			
 			_position = matrix::Vector3f(
 				msg->pose.pose.position.x,
 				msg->pose.pose.position.y,
 				msg->pose.pose.position.z
 			);
 
-			
 			if (std::isnan(_position(0)) || std::isnan(_position(1)) || std::isnan(_position(2))) {
 				RCLCPP_WARN(
 					this->get_logger(), 
@@ -55,9 +96,8 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 				return;  
 			}
 
-			
 			if (!_first_odom) {
-				
+
 				_x.pose.position.x = _position(0);
 				_x.pose.position.y = _position(1);
 				_x.pose.position.z = _position(2);
@@ -86,9 +126,7 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-	// _px4_vehicle_status_sub = this->create_subscription<px4_msgs::msg::VehicleStatus>("/fmu/out/vehicle_status", qos, std::bind(&OffboardControl::status_callback, this, std::placeholders::_1));
-
-	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>("/octomap_binary", qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
+	_octo_sub = this->create_subscription<octomap_msgs::msg::Octomap>(_octomap_topic, qos, std::bind(&OffboardControl::octomap_callback, this, std::placeholders::_1));
 	_map_set = false;	
 
 	_offboard_setpoint_counter = 0;
@@ -100,10 +138,9 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 
 	auto cmd_qos = rclcpp::QoS(rclcpp::QoSInitialization(cmd_qos_profile.history, 1), cmd_qos_profile);
 
-	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>("move_cmd", cmd_qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1));
+	_cmd_sub = this->create_subscription<trajectory_planner::msg::MoveCmd>(_move_cmd_topic, cmd_qos, std::bind(&OffboardControl::move_command_callback, this, std::placeholders::_1));
 
 	_timer = this->create_wall_timer(_timer_period, std::bind(&OffboardControl::offboard_callback, this));
-
 	_status_timer = this->create_wall_timer(_status_timer_period, std::bind(&OffboardControl::status_update, this));
 
 	//---Init planner
@@ -209,7 +246,7 @@ void OffboardControl::tf_lookup_loop() {
 	rclcpp::Rate rate(100);
 	while (rclcpp::ok()) {
 		try {
-			_tf_map_odom = tf_buffer_->lookupTransform("odom", "map", tf2::TimePointZero);
+			_tf_map_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, tf2::TimePointZero);
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
 		}
@@ -352,7 +389,7 @@ void OffboardControl::move_cmd(){
 								
 								geometry_msgs::msg::PointStamped point_in, point_out;
 								point_in.header.stamp = this->get_clock()->now();
-								point_in.header.frame_id = "map";
+								point_in.header.frame_id = _parent_transf;
 								point_in.point.x = sp(0);
 								point_in.point.y = sp(1);
 								point_in.point.z = sp(2);
@@ -470,7 +507,7 @@ void OffboardControl::key_input() {
 			
 			geometry_msgs::msg::PointStamped point_in, point_out;
 			point_in.header.stamp = this->get_clock()->now();
-			point_in.header.frame_id = "map";
+			point_in.header.frame_id = _parent_transf;
 			point_in.point.x = sp(0);
 			point_in.point.y = sp(1);
 			point_in.point.z = sp(2);
@@ -522,7 +559,7 @@ void OffboardControl::key_input() {
 				// Eigen::Vector3d pt_check;
 				// visualization_msgs::msg::Marker check_m;
 				// // Set the frame, timestamp, and namespace
-				// check_m.header.frame_id = "map";
+				// check_m.header.frame_id = _parent_transf;
 				// check_m.header.stamp = this->get_clock()->now();
 				// check_m.ns = "check";
 
@@ -599,7 +636,7 @@ void OffboardControl::key_input() {
 						// Transform point from map frame to odom frame
 						geometry_msgs::msg::PointStamped point_in, point_out;
 						point_in.header.stamp = this->get_clock()->now();
-						point_in.header.frame_id = "map";
+						point_in.header.frame_id = _parent_transf;
 						point_in.point.x = sp(0);
 						point_in.point.y = sp(1);
 						point_in.point.z = sp(2);
@@ -819,7 +856,7 @@ void OffboardControl::start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses
 				
 		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
-		point_in.header.frame_id = "map";
+		point_in.header.frame_id = _parent_transf;
 		point_in.point.x = sp(0);
 		point_in.point.y = sp(1);
 		point_in.point.z = sp(2);
@@ -960,7 +997,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	matrix::Vector3f prev_sp;
 	geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
-		point_in.header.frame_id = "map";
+		point_in.header.frame_id = _parent_transf;
 		point_in.point.x = _prev_sp(0);
 		point_in.point.y = _prev_sp(1);
 		point_in.point.z = _prev_sp(2);
@@ -991,7 +1028,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 
 	geometry_msgs::msg::PoseStamped p;
 	nav_msgs::msg::Path generated_path;
-	generated_path.header.frame_id = "map";
+	generated_path.header.frame_id = _parent_transf;
 
     _pp->set_start_state(s);
     _pp->set_goal_state(g);
@@ -1072,7 +1109,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 
     visualization_msgs::msg::Marker check_m;
 	// Set the frame, timestamp, and namespace
-	check_m.header.frame_id = "map";
+	check_m.header.frame_id = _parent_transf;
 	check_m.header.stamp = this->get_clock()->now();
 	check_m.ns = "check";
 

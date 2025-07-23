@@ -201,4 +201,16 @@ private:
 	int _max_replan_iterations{5};
 	std::string _status="IDLE";
 
+	std::string _offboard_control_mode_topic;
+	std::string _vehicle_command_topic;
+	std::string _trajectory_setpoint_topic;
+	std::string _odom_topic;
+	std::string _octomap_topic;
+	std::string _move_cmd_topic;
+	std::string _path_topic;
+	std::string _check_path_topic;
+	std::string _plan_status_topic;
+
+	std::string _parent_transf;
+	std::string _child_transf;
 };

@@ -17,20 +17,22 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
-    parameters=[{
-          'frame_id':'base_link',
-          'map_frame_id':'map',
-          'subscribe_depth':True,
-          'subscribe_odom_info':True,
-          'odom_frame_id': 'odom',
-          'approx_sync':True,
-          'qos_image':2,
-          'qos':2,
-          }]
+    parameters = [{
+        'frame_id': 'base_link',
+        'map_frame_id': 'map',
+        'odom_frame_id': 'odom',
+        'subscribe_depth': True,
+        'subscribe_odom_info': True,
+        'approx_sync': True,
+        'qos_image': 2,
+        'qos': 2,
+        'odom_topic': '/odom',
+        'rgbd_cameras': 1,
+        'rgbd_camera_frame_id': 'x500_depth_0/OakD-Lite/base_link/IMX214',  # o StereoOV7251 se preferisci
+    }]
 
     remappings=[
           ('rgb/image', '/camera'),
-          ('/odom', '/odom'),
           ('rgb/camera_info', '/camera_info'),
           ('depth/image','/depth_camera')]
 
