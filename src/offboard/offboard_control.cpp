@@ -54,6 +54,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_child_transf = this->get_parameter("child_transform").as_string();
 	RCLCPP_INFO(get_logger(), "child_transform: %s", _child_transf.c_str());
 
+	this->declare_parameter("check_frame_id", "odom");
+	_check_frame_id = this->get_parameter("check_frame_id").as_string();
+	RCLCPP_INFO(get_logger(), "check_frame_id: %s", _check_frame_id.c_str());
+
 	_offboard_control_mode_publisher =
 		this->create_publisher<OffboardControlMode>(_offboard_control_mode_topic, 10);
 
@@ -119,6 +123,18 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 			_first_odom = true;
 		}
 	);
+
+	_land_detect_sub = this->create_subscription<px4_msgs::msg::VehicleLandDetected>(
+		"/fmu/out/vehicle_land_detected", qos,
+		[&](const px4_msgs::msg::VehicleLandDetected::SharedPtr land_msg) {
+			if ((land_msg->ground_contact || land_msg->maybe_landed || land_msg->landed) && _last_cmd == "land") {
+				_is_flying = false;
+				this->disarm();
+				this->flight_termination(1);
+			} else {
+				_is_flying = true;
+			}
+		});
 
 	_x = {};
 	_xd = {};
@@ -211,6 +227,9 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_use_key_input = this->get_parameter("use_key_input").as_double(); // as_bool not working
 	RCLCPP_INFO(get_logger(), "use_key_input: %f", _use_key_input);	
 
+	this->declare_parameter("do_transform", 1.0);
+	_do_transform = this->get_parameter("do_transform").as_double(); // as_bool not working
+	RCLCPP_INFO(get_logger(), "do_transform: %f", _do_transform);
 
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
@@ -352,6 +371,7 @@ void OffboardControl::move_cmd(){
 			current_sp = _cmd_sp;
 			sp = current_sp;
 			_replan_cnt = 0;
+			_last_cmd = cmd;
 
 			if(cmd =="nav"){			
 
@@ -387,20 +407,23 @@ void OffboardControl::move_cmd(){
 								sp(1) = (*opt_poses)[wp_index].position.y;
 								sp(2) = (*opt_poses)[wp_index].position.z;    
 								
-								geometry_msgs::msg::PointStamped point_in, point_out;
-								point_in.header.stamp = this->get_clock()->now();
-								point_in.header.frame_id = _parent_transf;
-								point_in.point.x = sp(0);
-								point_in.point.y = sp(1);
-								point_in.point.z = sp(2);
-								try {
-									tf2::doTransform(point_in, point_out, _tf_map_odom);
-									sp(0) = point_out.point.x;
-									sp(1) = point_out.point.y;
-									sp(2) = point_out.point.z;
-								} catch (const tf2::TransformException &ex) {
-									RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+								if(_do_transform){
+									geometry_msgs::msg::PointStamped point_in, point_out;
+									point_in.header.stamp = this->get_clock()->now();
+									point_in.header.frame_id = _parent_transf;
+									point_in.point.x = sp(0);
+									point_in.point.y = sp(1);
+									point_in.point.z = sp(2);
+									try {
+										tf2::doTransform(point_in, point_out, _tf_map_odom);
+										sp(0) = point_out.point.x;
+										sp(1) = point_out.point.y;
+										sp(2) = point_out.point.z;
+									} catch (const tf2::TransformException &ex) {
+										RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+									}
 								}
+								
 								
 								compute_time_and_heading(sp, yaw_d, yaw_time, duration);
 								
@@ -496,6 +519,8 @@ void OffboardControl::key_input() {
 		std::cout << "Enter command [arm | takeoff | go | nav | land | term | stop]: \n"; 
 		std::cin >> cmd;
 
+		_last_cmd = cmd;
+
 		if(cmd == "go") {
 			
 			std::cout << "Enter X coordinate (ENU frame): "; 
@@ -505,21 +530,22 @@ void OffboardControl::key_input() {
 			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> sp(2);
 			
-			geometry_msgs::msg::PointStamped point_in, point_out;
-			point_in.header.stamp = this->get_clock()->now();
-			point_in.header.frame_id = _parent_transf;
-			point_in.point.x = sp(0);
-			point_in.point.y = sp(1);
-			point_in.point.z = sp(2);
-			try {
-				tf2::doTransform(point_in, point_out, _tf_map_odom);
-				sp(0) = point_out.point.x;
-				sp(1) = point_out.point.y;
-				sp(2) = point_out.point.z;
-			} catch (const tf2::TransformException &ex) {
-				RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+			if(_do_transform){
+				geometry_msgs::msg::PointStamped point_in, point_out;
+				point_in.header.stamp = this->get_clock()->now();
+				point_in.header.frame_id = _parent_transf;
+				point_in.point.x = sp(0);
+				point_in.point.y = sp(1);
+				point_in.point.z = sp(2);
+				try {
+					tf2::doTransform(point_in, point_out, _tf_map_odom);
+					sp(0) = point_out.point.x;
+					sp(1) = point_out.point.y;
+					sp(2) = point_out.point.z;
+				} catch (const tf2::TransformException &ex) {
+					RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+				}
 			}
-
 			compute_time_and_heading(sp, yaw_d, yaw_time, duration);
 
 			_replan = false;
@@ -552,68 +578,6 @@ void OffboardControl::key_input() {
 
 			if(plan_has_result){
 
-				//_replan = false;
-
-				// double s[3]; 
-				//CARTESIAN_PLANNER trajectory{_timer_freq};
-				// Eigen::Vector3d pt_check;
-				// visualization_msgs::msg::Marker check_m;
-				// // Set the frame, timestamp, and namespace
-				// check_m.header.frame_id = _parent_transf;
-				// check_m.header.stamp = this->get_clock()->now();
-				// check_m.ns = "check";
-
-				// // Set marker properties
-				// check_m.type = visualization_msgs::msg::Marker::CUBE;
-				// check_m.action = visualization_msgs::msg::Marker::ADD;
-
-				// // Set the scale of the marker
-				// check_m.scale.x = 0.15;
-				// check_m.scale.y = 0.15;
-				// check_m.scale.z = 0.15;
-
-				// // Set the color of the marker
-				// check_m.color.r = 1.0f;
-				// check_m.color.g = 0.0f;
-				// check_m.color.b = 0.0f;
-				// check_m.color.a = 1.0;
-
-				// // Marker lifetime
-				// check_m.lifetime = rclcpp::Duration(0, 0); // Infinite lifetime
-
-				// // Set marker ID
-				// check_m.id = 97;
-				// bool valid_path;
-
-				// start_wp_traj(opt_poses, trajectory);
-
-				// _trajectory = trajectory;
-
-				// while(_replan == false && _trajectory.isReady() == true){
-					
-				// 	for(int i = _trajectory.getCounter(); i < trajectory._x.size()-1; i++){
-				
-				// 		s[0] = trajectory._x[i].pose.position.y;
-				// 		s[1] = trajectory._x[i].pose.position.x;
-				// 		s[2] = -trajectory._x[i].pose.position.z;
-				// 		valid_path = _pp->check_state(s);
-				// 		check_m.pose.position.x = s[0];
-				// 		check_m.pose.position.y = s[1];
-				// 		check_m.pose.position.z = s[2];
-				// 		_check_path_pub->publish( check_m );
-
-				// 		if(!valid_path) break;
-
-				// 	}
-					
-				// 	if( !valid_path ) {
-				// 		RCLCPP_WARN(get_logger(), "New obstacle detected! Replan");
-				// 		_replan = true;
-				// 		_stop_trajectory = true;
-				// 		stop_traj();
-				// 	}
-				// }
-
 				_replan = false;
 
 				int wp_index = 1;
@@ -633,22 +597,23 @@ void OffboardControl::key_input() {
 						sp(1) = (*opt_poses)[wp_index].position.y;
 						sp(2) = (*opt_poses)[wp_index].position.z;    
 						
-						// Transform point from map frame to odom frame
-						geometry_msgs::msg::PointStamped point_in, point_out;
-						point_in.header.stamp = this->get_clock()->now();
-						point_in.header.frame_id = _parent_transf;
-						point_in.point.x = sp(0);
-						point_in.point.y = sp(1);
-						point_in.point.z = sp(2);
-						try {
-							tf2::doTransform(point_in, point_out, _tf_map_odom);
-							sp(0) = point_out.point.x;
-							sp(1) = point_out.point.y;
-							sp(2) = point_out.point.z;
-						} catch (const tf2::TransformException &ex) {
-							RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+						if(_do_transform){
+							// Transform point from map frame to odom frame
+							geometry_msgs::msg::PointStamped point_in, point_out;
+							point_in.header.stamp = this->get_clock()->now();
+							point_in.header.frame_id = _parent_transf;
+							point_in.point.x = sp(0);
+							point_in.point.y = sp(1);
+							point_in.point.z = sp(2);
+							try {
+								tf2::doTransform(point_in, point_out, _tf_map_odom);
+								sp(0) = point_out.point.x;
+								sp(1) = point_out.point.y;
+								sp(2) = point_out.point.z;
+							} catch (const tf2::TransformException &ex) {
+								RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+							}
 						}
-						
 						compute_time_and_heading(sp, yaw_d, yaw_time, duration);
 						
 						start_traj(_prev_sp, yaw_d, yaw_time);  //Blocking
@@ -854,21 +819,22 @@ void OffboardControl::start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses
 		sp(1) = (*opt_poses)[i].position.y;
 		sp(2) = (*opt_poses)[i].position.z; 
 				
-		geometry_msgs::msg::PointStamped point_in, point_out;
-		point_in.header.stamp = this->get_clock()->now();
-		point_in.header.frame_id = _parent_transf;
-		point_in.point.x = sp(0);
-		point_in.point.y = sp(1);
-		point_in.point.z = sp(2);
-		try {
-			tf2::doTransform(point_in, point_out, _tf_map_odom);
-			sp(0) = point_out.point.x;
-			sp(1) = point_out.point.y;
-			sp(2) = point_out.point.z;
-		} catch (const tf2::TransformException &ex) {
-			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+		if(_do_transform){
+			geometry_msgs::msg::PointStamped point_in, point_out;
+			point_in.header.stamp = this->get_clock()->now();
+			point_in.header.frame_id = _parent_transf;
+			point_in.point.x = sp(0);
+			point_in.point.y = sp(1);
+			point_in.point.z = sp(2);
+			try {
+				tf2::doTransform(point_in, point_out, _tf_map_odom);
+				sp(0) = point_out.point.x;
+				sp(1) = point_out.point.y;
+				sp(2) = point_out.point.z;
+			} catch (const tf2::TransformException &ex) {
+				RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+			}
 		}
-		
 
 		yaw_d = atan2(sp(1)-prev_sp(1),sp(0)-prev_sp(0)); 
 		yaw_d = std::isnan(yaw_d) ? prev_yaw_sp : yaw_d;
@@ -995,7 +961,8 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	}
 
 	matrix::Vector3f prev_sp;
-	geometry_msgs::msg::PointStamped point_in, point_out;
+	if(_do_transform){
+		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
 		point_in.header.frame_id = _parent_transf;
 		point_in.point.x = _prev_sp(0);
@@ -1009,7 +976,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 		} 
-
+		}
     s.position.x = prev_sp(0); 
     s.position.y = prev_sp(1);
     s.position.z = prev_sp(2);
@@ -1109,7 +1076,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 
     visualization_msgs::msg::Marker check_m;
 	// Set the frame, timestamp, and namespace
-	check_m.header.frame_id = _parent_transf;
+	check_m.header.frame_id = _check_frame_id;
 	check_m.header.stamp = this->get_clock()->now();
 	check_m.ns = "check";
 

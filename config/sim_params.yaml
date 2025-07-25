@@ -45,3 +45,5 @@ offboard_control:
 
     parent_transform: "map"
     child_transform: "odom"
+    do_transform: 1.0 # BOOL
+    check_frame_id: "odom" # Frame ID for the check marker

@@ -4,6 +4,7 @@
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 // #include <px4_msgs/msg/vehicle_status.hpp>
+#include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -120,7 +121,8 @@ private:
 	rclcpp::Subscription<trajectory_planner::msg::MoveCmd>::SharedPtr _cmd_sub;
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
-	
+	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _land_detect_sub;
+
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
 
@@ -188,10 +190,12 @@ private:
 	int _replan_cnt;
 
 	bool _stop_trajectory{false}, _plan_is_valid{true}, _wp_traj_completed{false};
+	double _do_transform;
 	double _use_key_input;
-
+	bool _is_flying{false};
 
 	std::string _cmd="";
+	std::string _last_cmd="";
 	matrix::Vector3f _cmd_sp;
 	bool _new_cmd{false};
 	bool _replan{false};
@@ -213,4 +217,5 @@ private:
 
 	std::string _parent_transf;
 	std::string _child_transf;
+	std::string _check_frame_id;
 };
