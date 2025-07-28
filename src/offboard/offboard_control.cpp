@@ -315,7 +315,7 @@ void OffboardControl::offboard_callback() {
 	_trajectory.getNext(_x,_xd,_xdd);
 
 	// offboard_control_mode needs to be paired with trajectory_setpoint
-	publish_offboard_control_mode();
+	// publish_offboard_control_mode();
 	publish_trajectory_setpoint();
 
 	// stop the counter after reaching 11
@@ -372,6 +372,8 @@ void OffboardControl::move_cmd(){
 			sp = current_sp;
 			_replan_cnt = 0;
 			_last_cmd = cmd;
+
+			this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 
 			if(cmd =="nav"){			
 
@@ -520,7 +522,7 @@ void OffboardControl::key_input() {
 		std::cin >> cmd;
 
 		_last_cmd = cmd;
-
+		this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 		if(cmd == "go") {
 			
 			std::cout << "Enter X coordinate (ENU frame): "; 
@@ -707,20 +709,20 @@ void OffboardControl::flight_termination(float value){
 	RCLCPP_INFO(this->get_logger(), "Flight Termination command send");
 }
 
-void OffboardControl::publish_offboard_control_mode() {
-	OffboardControlMode msg{};
-	rclcpp::Time now = this->get_clock()->now();
+// void OffboardControl::publish_offboard_control_mode() {
+// 	OffboardControlMode msg{};
+// 	rclcpp::Time now = this->get_clock()->now();
 
-	msg.timestamp = now.nanoseconds() / 1000.0;
+// 	msg.timestamp = now.nanoseconds() / 1000.0;
 
-	msg.position = true;
-	msg.velocity = true;
-	msg.acceleration = true;
-	msg.attitude = true;
-	msg.body_rate = false;
+// 	msg.position = true;
+// 	msg.velocity = true;
+// 	msg.acceleration = true;
+// 	msg.attitude = true;
+// 	msg.body_rate = false;
 
-	_offboard_control_mode_publisher->publish(msg);
-}
+// 	_offboard_control_mode_publisher->publish(msg);
+// }
 
 void OffboardControl::publish_trajectory_setpoint() {
 

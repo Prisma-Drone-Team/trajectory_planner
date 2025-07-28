@@ -140,11 +140,11 @@ private:
 
 	uint64_t _offboard_setpoint_counter;   //!< counter for the number of setpoints sent
 
-	/**
-	 * @brief Publish the offboard control mode.
-	 *        For this example, only position and altitude controls are active.
-	 */
-	void publish_offboard_control_mode();
+	// /**
+	//  * @brief Publish the offboard control mode.
+	//  *        For this example, only position and altitude controls are active.
+	//  */
+	// void publish_offboard_control_mode();
 	// /**
 	//  * @brief Publish a trajectory setpoint
 	//  *        For this example, it sends a trajectory setpoint to make the

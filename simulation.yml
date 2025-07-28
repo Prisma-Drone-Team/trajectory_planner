@@ -1,7 +1,7 @@
 session_name: simulation
 socket_name: drone
 environment:
-  ROS_DOMAIN_ID: "78"
+  ROS_DOMAIN_ID: "17"
 pre_window: 
 windows:
 - window_name: px4
@@ -54,8 +54,8 @@ windows:
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch drone_odometry2 px4_tf_pub.launch.py
+        -  ros2 launch drone_odometry2 px4_tf_pub.launch.py 
     - shell_command:
-        - sleep 5
+        - sleep 35
         - cd ~/ros2_ws && source install/setup.bash
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" 
