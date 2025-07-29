@@ -97,7 +97,7 @@ private:
 	rclcpp::TimerBase::SharedPtr _timer;
 	rclcpp::TimerBase::SharedPtr _check_timer;
 	rclcpp::TimerBase::SharedPtr _status_timer;
-	milliseconds _timer_period{10ms};
+	milliseconds _timer_period{20ms};
 	milliseconds _status_timer_period{200ms};
 	
 	float _timer_freq{100.0f};
@@ -106,7 +106,7 @@ private:
 	void stop_traj();
 	void compute_time_and_heading(const matrix::Vector3f & sp, float & yaw_d, float & yaw_time, float & duration);
 	void start_traj(matrix::Vector3f pos, float yaw, double d);
-	void start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses, CARTESIAN_PLANNER & trajectory);
+	// void start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses, CARTESIAN_PLANNER & trajectory);
 	bool plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>> opt_poses);
 
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr _offboard_control_mode_publisher;
@@ -136,7 +136,7 @@ private:
 
 	std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-	geometry_msgs::msg::TransformStamped _tf_map_odom;
+	geometry_msgs::msg::TransformStamped _tf_map_to_odom, _tf_odom_to_map;
 
 	uint64_t _offboard_setpoint_counter;   //!< counter for the number of setpoints sent
 

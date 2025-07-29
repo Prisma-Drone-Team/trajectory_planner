@@ -20,10 +20,10 @@ windows:
         - sleep 5  
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 launch trajectory_planner rtabmap_sim.launch.py
-    - shell_command:
-        - sleep 5  
-        - cd ~/ros2_ws && source install/setup.bash
-        #- ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
+#    - shell_command:
+#        - sleep 5  
+#        - cd ~/ros2_ws && source install/setup.bash
+#        #- ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
@@ -42,7 +42,7 @@ windows:
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 run trajectory_planner move_manager_node
+        - ros2 run trajectory_planner move_manager_node --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
     - shell_command:
         - sleep 30
         - cd ~/ros2_ws && source install/setup.bash
@@ -56,6 +56,6 @@ windows:
         - cd ~/ros2_ws && source install/setup.bash
         -  ros2 launch drone_odometry2 px4_tf_pub.launch.py 
     - shell_command:
-        - sleep 35
+        - sleep 30
         - cd ~/ros2_ws && source install/setup.bash
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" 

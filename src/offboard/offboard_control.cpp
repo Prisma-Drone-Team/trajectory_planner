@@ -265,7 +265,8 @@ void OffboardControl::tf_lookup_loop() {
 	rclcpp::Rate rate(100);
 	while (rclcpp::ok()) {
 		try {
-			_tf_map_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, tf2::TimePointZero);
+			_tf_map_to_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, tf2::TimePointZero);
+			_tf_odom_to_map = tf_buffer_->lookupTransform(_parent_transf, _child_transf, tf2::TimePointZero);
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
 		}
@@ -347,7 +348,7 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 void OffboardControl::move_cmd(){
 	
 	std::string cmd;
-	matrix::Vector3f sp;
+	matrix::Vector3f sp, sp_odom;
 	Eigen::Vector3d wp;
 	matrix::Vector3f current_sp;
 	float duration;
@@ -417,20 +418,20 @@ void OffboardControl::move_cmd(){
 									point_in.point.y = sp(1);
 									point_in.point.z = sp(2);
 									try {
-										tf2::doTransform(point_in, point_out, _tf_map_odom);
-										sp(0) = point_out.point.x;
-										sp(1) = point_out.point.y;
-										sp(2) = point_out.point.z;
+										tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+										sp_odom(0) = point_out.point.x;
+										sp_odom(1) = point_out.point.y;
+										sp_odom(2) = point_out.point.z;
 									} catch (const tf2::TransformException &ex) {
 										RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 									}
 								}
 								
 								
-								compute_time_and_heading(sp, yaw_d, yaw_time, duration);
+								compute_time_and_heading(sp_odom, yaw_d, yaw_time, duration);
 								
 								start_traj(_prev_sp, yaw_d, yaw_time);  //Blocking
-								start_traj(sp, yaw_d, duration);	
+								start_traj(sp_odom, yaw_d, duration);	
 								*id_wp_ptr = wp_index;
 								wp_index++;
 
@@ -508,7 +509,7 @@ void OffboardControl::key_input() {
 	bool exit = false;
 	bool plan_has_result = true;
 	std::string cmd;
-	matrix::Vector3f sp;
+	matrix::Vector3f sp, sp_odom;
 	float duration;
 	float yaw_time;
 	float  yaw_d;
@@ -532,22 +533,6 @@ void OffboardControl::key_input() {
 			std::cout << "Enter Z coordinate (ENU frame): "; 
 			std::cin >> sp(2);
 			
-			if(_do_transform){
-				geometry_msgs::msg::PointStamped point_in, point_out;
-				point_in.header.stamp = this->get_clock()->now();
-				point_in.header.frame_id = _parent_transf;
-				point_in.point.x = sp(0);
-				point_in.point.y = sp(1);
-				point_in.point.z = sp(2);
-				try {
-					tf2::doTransform(point_in, point_out, _tf_map_odom);
-					sp(0) = point_out.point.x;
-					sp(1) = point_out.point.y;
-					sp(2) = point_out.point.z;
-				} catch (const tf2::TransformException &ex) {
-					RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
-				}
-			}
 			compute_time_and_heading(sp, yaw_d, yaw_time, duration);
 
 			_replan = false;
@@ -608,18 +593,18 @@ void OffboardControl::key_input() {
 							point_in.point.y = sp(1);
 							point_in.point.z = sp(2);
 							try {
-								tf2::doTransform(point_in, point_out, _tf_map_odom);
-								sp(0) = point_out.point.x;
-								sp(1) = point_out.point.y;
-								sp(2) = point_out.point.z;
+								tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+								sp_odom(0) = point_out.point.x;
+								sp_odom(1) = point_out.point.y;
+								sp_odom(2) = point_out.point.z;
 							} catch (const tf2::TransformException &ex) {
 								RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 							}
 						}
-						compute_time_and_heading(sp, yaw_d, yaw_time, duration);
+						compute_time_and_heading(sp_odom, yaw_d, yaw_time, duration);
 						
 						start_traj(_prev_sp, yaw_d, yaw_time);  //Blocking
-						start_traj(sp, yaw_d, duration);	
+						start_traj(sp_odom, yaw_d, duration);	
 						
 						*id_wp_ptr = wp_index;
 						wp_index++;
@@ -784,107 +769,107 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	_vehicle_command_publisher->publish(msg);
 }
 
-void OffboardControl::start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses, CARTESIAN_PLANNER & trajectory) {
+// void OffboardControl::start_wp_traj(std::shared_ptr<std::vector<POSE>> opt_poses, CARTESIAN_PLANNER & trajectory) {
 
-	matrix::Vector3f sp;
-	matrix::Vector3f prev_sp;
-	matrix::Quaternionf prev_att_sp;
-	matrix::Quaternionf att;
-	float prev_yaw_sp;
-	double duration;
-	double yaw_time;
-	float yaw_d;
+// 	matrix::Vector3f sp;
+// 	matrix::Vector3f prev_sp;
+// 	matrix::Quaternionf prev_att_sp;
+// 	matrix::Quaternionf att;
+// 	float prev_yaw_sp;
+// 	double duration;
+// 	double yaw_time;
+// 	float yaw_d;
 
-	std::vector<geometry_msgs::msg::PoseStamped> poses;
-	std::vector<double> times;
-	geometry_msgs::msg::PoseStamped p;
-	double t = 0.0f;
+// 	std::vector<geometry_msgs::msg::PoseStamped> poses;
+// 	std::vector<double> times;
+// 	geometry_msgs::msg::PoseStamped p;
+// 	double t = 0.0f;
 
-	prev_sp = _prev_sp;
-	prev_att_sp = _prev_att_sp;
-	prev_yaw_sp = matrix::Eulerf(prev_att_sp).psi();
+// 	prev_sp = _prev_sp;
+// 	prev_att_sp = _prev_att_sp;
+// 	prev_yaw_sp = matrix::Eulerf(prev_att_sp).psi();
 
-	p.pose.position.x = prev_sp(0);
-	p.pose.position.y = prev_sp(1);
-	p.pose.position.z = prev_sp(2); 
+// 	p.pose.position.x = prev_sp(0);
+// 	p.pose.position.y = prev_sp(1);
+// 	p.pose.position.z = prev_sp(2); 
 
-	p.pose.orientation.w = prev_att_sp(0);
-	p.pose.orientation.x = prev_att_sp(1);
-	p.pose.orientation.y = prev_att_sp(2);
-	p.pose.orientation.z = prev_att_sp(3);
+// 	p.pose.orientation.w = prev_att_sp(0);
+// 	p.pose.orientation.x = prev_att_sp(1);
+// 	p.pose.orientation.y = prev_att_sp(2);
+// 	p.pose.orientation.z = prev_att_sp(3);
 
-	poses.push_back(p);
-	times.push_back(t);
+// 	poses.push_back(p);
+// 	times.push_back(t);
 
-	for(int i = 1; i<int(opt_poses->size()); i++) {
-		sp(0) = (*opt_poses)[i].position.x;
-		sp(1) = (*opt_poses)[i].position.y;
-		sp(2) = (*opt_poses)[i].position.z; 
+// 	for(int i = 1; i<int(opt_poses->size()); i++) {
+// 		sp(0) = (*opt_poses)[i].position.x;
+// 		sp(1) = (*opt_poses)[i].position.y;
+// 		sp(2) = (*opt_poses)[i].position.z; 
 				
-		if(_do_transform){
-			geometry_msgs::msg::PointStamped point_in, point_out;
-			point_in.header.stamp = this->get_clock()->now();
-			point_in.header.frame_id = _parent_transf;
-			point_in.point.x = sp(0);
-			point_in.point.y = sp(1);
-			point_in.point.z = sp(2);
-			try {
-				tf2::doTransform(point_in, point_out, _tf_map_odom);
-				sp(0) = point_out.point.x;
-				sp(1) = point_out.point.y;
-				sp(2) = point_out.point.z;
-			} catch (const tf2::TransformException &ex) {
-				RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
-			}
-		}
+// 		if(_do_transform){
+// 			geometry_msgs::msg::PointStamped point_in, point_out;
+// 			point_in.header.stamp = this->get_clock()->now();
+// 			point_in.header.frame_id = _parent_transf;
+// 			point_in.point.x = sp(0);
+// 			point_in.point.y = sp(1);
+// 			point_in.point.z = sp(2);
+// 			try {
+// 				tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+// 				sp(0) = point_out.point.x;
+// 				sp(1) = point_out.point.y;
+// 				sp(2) = point_out.point.z;
+// 			} catch (const tf2::TransformException &ex) {
+// 				RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+// 			}
+// 		}
 
-		yaw_d = atan2(sp(1)-prev_sp(1),sp(0)-prev_sp(0)); 
-		yaw_d = std::isnan(yaw_d) ? prev_yaw_sp : yaw_d;
-		att = matrix::Eulerf(0, 0, yaw_d);
+// 		yaw_d = atan2(sp(1)-prev_sp(1),sp(0)-prev_sp(0)); 
+// 		yaw_d = std::isnan(yaw_d) ? prev_yaw_sp : yaw_d;
+// 		att = matrix::Eulerf(0, 0, yaw_d);
 
-		yaw_time = 1.0 + std::abs(prev_yaw_sp - yaw_d)/_max_yaw_rate;
-		duration = 1.0 + std::sqrt(pow(sp(0) - prev_sp(0),2)+pow(sp(1) - prev_sp(1),2)+pow(sp(2) - prev_sp(2),2))/_max_velocity;
+// 		yaw_time = 1.0 + std::abs(prev_yaw_sp - yaw_d)/_max_yaw_rate;
+// 		duration = 1.0 + std::sqrt(pow(sp(0) - prev_sp(0),2)+pow(sp(1) - prev_sp(1),2)+pow(sp(2) - prev_sp(2),2))/_max_velocity;
 
 
-		p.pose.position.x = prev_sp(0);
-		p.pose.position.y = prev_sp(1);
-		p.pose.position.z = prev_sp(2); 
+// 		p.pose.position.x = prev_sp(0);
+// 		p.pose.position.y = prev_sp(1);
+// 		p.pose.position.z = prev_sp(2); 
 
-		p.pose.orientation.w = att(0);
-		p.pose.orientation.x = att(1);
-		p.pose.orientation.y = att(2);
-		p.pose.orientation.z = att(3);
+// 		p.pose.orientation.w = att(0);
+// 		p.pose.orientation.x = att(1);
+// 		p.pose.orientation.y = att(2);
+// 		p.pose.orientation.z = att(3);
 		
-		t = t + yaw_time;
-		poses.push_back(p);
-		times.push_back(t);
+// 		t = t + yaw_time;
+// 		poses.push_back(p);
+// 		times.push_back(t);
 		
-		/* */
-		p.pose.position.x = sp(0);
-		p.pose.position.y = sp(1);
-		p.pose.position.z = sp(2); 
+// 		/* */
+// 		p.pose.position.x = sp(0);
+// 		p.pose.position.y = sp(1);
+// 		p.pose.position.z = sp(2); 
 
-		p.pose.orientation.w = att(0);
-		p.pose.orientation.x = att(1);
-		p.pose.orientation.y = att(2);
-		p.pose.orientation.z = att(3);
+// 		p.pose.orientation.w = att(0);
+// 		p.pose.orientation.x = att(1);
+// 		p.pose.orientation.y = att(2);
+// 		p.pose.orientation.z = att(3);
 
-		t = t + yaw_time + duration;
-		poses.push_back(p);
-		times.push_back(t);
+// 		t = t + yaw_time + duration;
+// 		poses.push_back(p);
+// 		times.push_back(t);
 
-		prev_sp = sp;
-		prev_att_sp = att;
+// 		prev_sp = sp;
+// 		prev_att_sp = att;
 
-	}
-	trajectory.set_waypoints(poses, times);
+// 	}
+// 	trajectory.set_waypoints(poses, times);
 
-	trajectory.compute();
+// 	trajectory.compute();
 
-	_prev_sp = sp;
-	_prev_att_sp = prev_att_sp;
-	_prev_yaw_sp = matrix::Eulerf(prev_att_sp).psi();
-}
+// 	_prev_sp = sp;
+// 	_prev_att_sp = prev_att_sp;
+// 	_prev_yaw_sp = matrix::Eulerf(prev_att_sp).psi();
+// }
 
 void OffboardControl::start_traj(matrix::Vector3f pos, float yaw, double d) {
 	
@@ -962,7 +947,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
 	}
 
-	matrix::Vector3f prev_sp;
+	matrix::Vector3f prev_sp_map;
 	if(_do_transform){
 		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
@@ -971,17 +956,17 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 		point_in.point.y = _prev_sp(1);
 		point_in.point.z = _prev_sp(2);
 		try {
-			tf2::doTransform(point_in, point_out, _tf_map_odom);
-			prev_sp(0) = point_out.point.x;
-			prev_sp(1) = point_out.point.y;
-			prev_sp(2) = point_out.point.z;
+			tf2::doTransform(point_in, point_out, _tf_odom_to_map);
+			prev_sp_map(0) = point_out.point.x;
+			prev_sp_map(1) = point_out.point.y;
+			prev_sp_map(2) = point_out.point.z;
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 		} 
 		}
-    s.position.x = prev_sp(0); 
-    s.position.y = prev_sp(1);
-    s.position.z = prev_sp(2);
+    s.position.x = prev_sp_map(0); 
+    s.position.y = prev_sp_map(1);
+    s.position.z = prev_sp_map(2);
     s.orientation.w = 1.0; // _last_att_sp(0); 
     s.orientation.x = 0.0; // _last_att_sp(1);
     s.orientation.y = 0.0; // _last_att_sp(2);
