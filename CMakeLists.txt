@@ -18,6 +18,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
@@ -66,7 +67,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs nav_msgs Boost tf2 tf2_ros)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs nav_msgs Boost tf2 tf2_ros tf2_geometry_msgs)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 ############

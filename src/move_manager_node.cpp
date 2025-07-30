@@ -20,6 +20,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2/exceptions.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #define SIMULATION 1
 
@@ -46,7 +47,7 @@ class MoveManager : public rclcpp::Node
             _tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
             _static_tf_broadcaster = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
 
-            
+           
 
             _pdt_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             _pdt_tf_listener=   std::make_shared<tf2_ros::TransformListener>(*_pdt_tf_buffer);
@@ -54,34 +55,70 @@ class MoveManager : public rclcpp::Node
             rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		    auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
+
             //_odom_publisher = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
+            
+
             if(SIMULATION){
                 this->staticTfPub();
-                _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", qos_px4,
-                    [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
+                // _px4_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", qos_px4,
+                //     [this](const px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
+                //         // Prepare the TransformStamped message
+                //         geometry_msgs::msg::TransformStamped transform_stamped;
+
+                //         // Set the header
+                //         transform_stamped.header.stamp = this->get_clock()->now();
+                //         transform_stamped.header.frame_id = "odomNED";  // Set to appropriate frame (ENU)
+                //         transform_stamped.child_frame_id = "base_link_FRD";  // Set to appropriate frame
+
+                //         // Set translation (position)
+                //         transform_stamped.transform.translation.x = msg->position[0];
+                //         transform_stamped.transform.translation.y = msg->position[1];
+                //         transform_stamped.transform.translation.z = msg->position[2];
+
+                //         // Set rotation (orientation)
+                //         transform_stamped.transform.rotation.x = msg->q.data()[1];
+                //         transform_stamped.transform.rotation.y = msg->q.data()[2];
+                //         transform_stamped.transform.rotation.z = msg->q.data()[3];
+                //         transform_stamped.transform.rotation.w = msg->q.data()[0];
+
+                //         // Broadcast the transform
+                //         _tf_broadcaster->sendTransform(transform_stamped);
+                        
+ 
+                // });
+
+                // Publisher for PX4 visual odometry
+                // _px4_visual_odom_publisher = this->create_publisher<px4_msgs::msg::VehicleOdometry>("/fmu/in/vehicle_visual_odometry", 10);
+            
+
+                // // QoS for standard nav_msgs/Odometry
+                auto qos_odom = rclcpp::QoS(rclcpp::KeepLast(10)).reliability(rclcpp::ReliabilityPolicy::BestEffort);
+
+                _odometry_sub = this->create_subscription<nav_msgs::msg::Odometry>("/model/x500_depth_0/odometry", qos_odom,
+                    [this](const nav_msgs::msg::Odometry::UniquePtr msg) {
                         // Prepare the TransformStamped message
                         geometry_msgs::msg::TransformStamped transform_stamped;
-
+                        
                         // Set the header
-                        transform_stamped.header.stamp = this->get_clock()->now();
-                        transform_stamped.header.frame_id = "odomNED";  // Set to appropriate frame (ENU)
-                        transform_stamped.child_frame_id = "base_link_FRD";  // Set to appropriate frame
+                        transform_stamped.header.stamp = msg->header.stamp; // this->get_clock()->now();
+                        transform_stamped.header.frame_id = "odom";  // Set to appropriate frame (ENU)
+                        transform_stamped.child_frame_id = "base_link";  // Set to appropriate frame
 
                         // Set translation (position)
-                        transform_stamped.transform.translation.x = msg->position[0];
-                        transform_stamped.transform.translation.y = msg->position[1];
-                        transform_stamped.transform.translation.z = msg->position[2];
+                        transform_stamped.transform.translation.x = msg->pose.pose.position.x;
+                        transform_stamped.transform.translation.y = msg->pose.pose.position.y;
+                        transform_stamped.transform.translation.z = msg->pose.pose.position.z;
 
-                        // Set rotation (orientation)
-                        transform_stamped.transform.rotation.x = msg->q.data()[1];
-                        transform_stamped.transform.rotation.y = msg->q.data()[2];
-                        transform_stamped.transform.rotation.z = msg->q.data()[3];
-                        transform_stamped.transform.rotation.w = msg->q.data()[0];
+                        transform_stamped.transform.rotation.x = msg->pose.pose.orientation.x;
+                        transform_stamped.transform.rotation.y = msg->pose.pose.orientation.y;
+                        transform_stamped.transform.rotation.z = msg->pose.pose.orientation.z;
+                        transform_stamped.transform.rotation.w = msg->pose.pose.orientation.w   ;
+
 
                         // Broadcast the transform
                         _tf_broadcaster->sendTransform(transform_stamped);
-                        
- 
+
                 });
             }
 
@@ -117,35 +154,57 @@ class MoveManager : public rclcpp::Node
             // CHECK conversion from ENU to NED + move in the launch file static transforms
             geometry_msgs::msg::TransformStamped t;
 
+            // t.header.stamp = this->get_clock()->now();
+            // t.header.frame_id = "odom";
+            // t.child_frame_id = "odomNED";
+
+            // t.transform.translation.x = 0.0;
+            // t.transform.translation.y = 0.0;
+            // t.transform.translation.z = 0.0;
+
+            // t.transform.rotation.x = 0.7071068;
+            // t.transform.rotation.y = 0.7071068;
+            // t.transform.rotation.z = 0.0;
+            // t.transform.rotation.w = 0.0;
+
+
+            // t.transform.rotation.x = -1.0;
+            // t.transform.rotation.y = 0.;
+            // t.transform.rotation.z = 0.0;
+            // t.transform.rotation.w = 0.0;
+
             t.header.stamp = this->get_clock()->now();
-            t.header.frame_id = "odom";
-            t.child_frame_id = "odomNED";
+            t.header.frame_id = "base_link";
+            t.child_frame_id = "x500_depth_0/OakD-Lite/base_link/IMX214";
+
+            t.transform.translation.x = 0.15;
+            t.transform.translation.y = 0.03;
+            t.transform.translation.z = 0.202;
+
+            tf2::Quaternion q;
+            q.setRPY(-1.5707, 0, -1.5707);
+            t.transform.rotation.x = q.x();
+            t.transform.rotation.y = q.y();
+            t.transform.rotation.z = q.z();
+            t.transform.rotation.w = q.w();
+            _static_tf_broadcaster->sendTransform(t);
+
+
+            t.header.stamp = this->get_clock()->now();
+            t.header.frame_id = "base_link";
+            t.child_frame_id = "base_link_FRD";
 
             t.transform.translation.x = 0.0;
             t.transform.translation.y = 0.0;
             t.transform.translation.z = 0.0;
 
-            t.transform.rotation.x = 0.7071068;
-            t.transform.rotation.y = 0.7071068;
+            t.transform.rotation.x = -1.0;
+            t.transform.rotation.y = 0.;
             t.transform.rotation.z = 0.0;
             t.transform.rotation.w = 0.0;
 
             _static_tf_broadcaster->sendTransform(t);
 
-            geometry_msgs::msg::TransformStamped goal;
-
-            goal.header.stamp = this->get_clock()->now();
-            goal.header.frame_id = "odom"; //"map"
-            goal.child_frame_id = "goal3";
-            goal.transform.translation.x = 5.0;
-            goal.transform.translation.y = 5.0;
-            goal.transform.translation.z = 1.0;
-            goal.transform.rotation.x = 0.7071068;
-            goal.transform.rotation.y = 0.7071068;
-            goal.transform.rotation.z = 0.0;
-            goal.transform.rotation.w = 0.0;
-
-            _static_tf_broadcaster->sendTransform(goal);
         }
 
         void send_move_cmd(const std::string& cmd, const geometry_msgs::msg::Pose& pose);
@@ -164,9 +223,11 @@ class MoveManager : public rclcpp::Node
         
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr _odom_publisher;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _pdt_publisher;
+        rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr _px4_visual_odom_publisher;
         // Subscriber for vehicle odometry
-        rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odometry_sub;
-         
+        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odometry_sub;
+        rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _px4_odometry_sub;
+
         // Subscriber for planner status
         rclcpp::Subscription<std_msgs::msg::String>::SharedPtr _plan_status_sub;
         // Subscriber for GCS command
