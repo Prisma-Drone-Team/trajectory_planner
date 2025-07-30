@@ -1,7 +1,7 @@
 session_name: simulation
 socket_name: drone
 environment:
-  ROS_DOMAIN_ID: "18"
+  ROS_DOMAIN_ID: "17"
 pre_window: 
 windows:
 - window_name: px4
@@ -25,7 +25,7 @@ windows:
         - sleep 5  
         - cd ~/ros2_ws && source install/setup.bash
         # - ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
-        # - ros2 run joy joy_node 
+        - ros2 run joy joy_node --ros-args -r use_sim_time:=true 
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
@@ -56,7 +56,7 @@ windows:
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch drone_odometry2 px4_tf_pub_simulation.launch.py use_sim_time:=true
+        - ros2 launch drone_odometry2 px4_tf_pub.launch.py use_sim_time:=true
     - shell_command:
         - sleep 1
         - cd ~/ros2_ws && source install/setup.bash
