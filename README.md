@@ -126,8 +126,7 @@ The system accepts these keyboard commands:
 ```bash
 # Basic commands
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}"
-ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'go 5.0 3.0 2.0'}"
-ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'nav 10.0 5.0 3.0'}"
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" #X=1-7
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}"
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"
 ```
