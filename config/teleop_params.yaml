@@ -1,0 +1,27 @@
+# Configurazione per il nodo di teleoperazione PX4
+teleop_node:
+  ros__parameters:
+    # Topic configuration
+    joy_topic: "/joy"
+    odom_topic: "/px4/odometry/out"
+    trajectory_setpoint_topic: "/px4/trajectory_setpoint_enu"
+    offboard_control_mode_topic: "fmu/in/offboard_control_mode"
+    vehicle_command_topic: "fmu/in/vehicle_command"
+    
+    # Control parameters
+    max_velocity: 2.0        # m/s
+    max_yaw_rate: 1.0        # rad/s
+    velocity_scale: 1.0      # Scaling factor for linear velocities
+    yaw_scale: 1.0           # Scaling factor for yaw rate
+    
+    # Joystick axis mapping (Xbox/PS4 controller standard)
+    axis_x: 0               # Left stick horizontal (roll)
+    axis_y: 1               # Left stick vertical (pitch)
+    axis_z: 3               # Right stick vertical (throttle)
+    axis_yaw: 2             # Right stick horizontal (yaw)
+    
+    # Button mapping
+    button_arm: 0           # A/X button - Arm/Disarm
+    button_takeoff: 1       # B/Circle button - Takeoff
+    button_land: 2          # X/Square button - Land
+    button_emergency: 3     # Y/Triangle button - Emergency stop

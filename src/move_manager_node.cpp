@@ -348,6 +348,15 @@ public:
                     send_move_cmd(cmd_to_send, sp);
                     RCLCPP_INFO(this->get_logger(), "LAND command sent");
                 }
+                else if (cv[0] == "teleop")
+                {
+                    // Controlla se il comando teleop può essere inviato
+                    // L'offboard_control verificherà se joy è disponibile
+                    cmd_to_send = "teleop";
+                    _current_command = _received_command;
+                    send_move_cmd(cmd_to_send, sp);
+                    RCLCPP_INFO(this->get_logger(), "TELEOP command sent (subject to joy availability check)");
+                }
                 else
                 {
                     RCLCPP_ERROR(this->get_logger(), "Invalid command");
@@ -366,7 +375,7 @@ public:
             sp.position.x = 0.0;
             sp.position.y = 0.0;
             sp.position.z = 0.0;
-            std::cout << "Enter command [arm | takeoff | go | nav | land | term ]: \n";
+            std::cout << "Enter command [arm | takeoff | go | nav | land | term | teleop ]: \n";
             std::cin >> _cmd;
             if (_cmd == "go" || _cmd == "nav")
             {
@@ -386,6 +395,12 @@ public:
             }
             else if (_cmd == "arm" || _cmd == "stop" || _cmd == "land" || _cmd == "term")
             {
+                send_move_cmd(_cmd, sp);
+            }
+            else if (_cmd == "teleop")
+            {
+                std::cout << "Sending teleop command to offboard_control.\n";
+                std::cout << "Note: Teleop will only activate if joy_node is running.\n";
                 send_move_cmd(_cmd, sp);
             }
             else

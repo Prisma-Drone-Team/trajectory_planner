@@ -7,6 +7,7 @@
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
+#include <sensor_msgs/msg/joy.hpp>
 
 // #include <Eigen/Matrix>
 // #include <Eigen/Geometry>
@@ -80,6 +81,10 @@ public:
 
 	void flight_termination(float val);
 
+	// Teleop methods
+	void teleop_mode();
+	void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg);
+
 
 
 
@@ -122,6 +127,7 @@ private:
 	rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr _octo_sub;
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _land_detect_sub;
+	rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr _joy_sub;
 
 
 	std::atomic<uint64_t> _timestamp;   //!< common synced timestamped
@@ -218,4 +224,24 @@ private:
 	std::string _parent_transf;
 	std::string _child_transf;
 	std::string _check_frame_id;
+
+	// Teleop variables
+	bool _teleop_active{false};
+	bool _joy_available{false};  // Flag di sicurezza - true solo se joy_node è disponibile
+	matrix::Vector3f _teleop_velocity{0.0f, 0.0f, 0.0f};
+	matrix::Vector3f _teleop_position{0.0f, 0.0f, 0.0f};
+	float _teleop_yaw{0.0f};
+	float _teleop_yawspeed{0.0f};
+	float _teleop_max_vel{1.0f};
+	float _teleop_max_yaw_rate{1.0f};
+	
+	// Joy axis mapping (default Xbox controller)
+	int _axis_linear_x{1};   // Left stick vertical
+	int _axis_linear_y{0};   // Left stick horizontal  
+	int _axis_linear_z{4};   // Right stick vertical
+	int _axis_angular_z{3};  // Right stick horizontal
+	int _button_enable{4};   // LB button
+	int _button_arm{0};      // A button
+	int _button_takeoff{3};  // Y button
+	int _button_land{1};     // B button
 };

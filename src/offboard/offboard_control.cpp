@@ -136,6 +136,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 			}
 		});
 
+	// Joy subscriber for teleop
+	_joy_sub = this->create_subscription<sensor_msgs::msg::Joy>(
+		"/joy", qos, std::bind(&OffboardControl::joy_callback, this, std::placeholders::_1));
+
 	_x = {};
 	_xd = {};
 	_xdd = {};
@@ -231,6 +235,47 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_do_transform = this->get_parameter("do_transform").as_double(); // as_bool not working
 	RCLCPP_INFO(get_logger(), "do_transform: %f", _do_transform);
 
+	// Teleop parameters
+	this->declare_parameter("teleop_max_vel", 1.0);
+	_teleop_max_vel = this->get_parameter("teleop_max_vel").as_double();
+	RCLCPP_INFO(get_logger(), "teleop_max_vel: %f", _teleop_max_vel);
+
+	this->declare_parameter("teleop_max_yaw_rate", 1.0);
+	_teleop_max_yaw_rate = this->get_parameter("teleop_max_yaw_rate").as_double();
+	RCLCPP_INFO(get_logger(), "teleop_max_yaw_rate: %f", _teleop_max_yaw_rate);
+
+	this->declare_parameter("teleop_axis_linear_x", 1);
+	_axis_linear_x = this->get_parameter("teleop_axis_linear_x").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_axis_linear_x: %d", _axis_linear_x);
+
+	this->declare_parameter("teleop_axis_linear_y", 0);
+	_axis_linear_y = this->get_parameter("teleop_axis_linear_y").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_axis_linear_y: %d", _axis_linear_y);
+
+	this->declare_parameter("teleop_axis_linear_z", 4);
+	_axis_linear_z = this->get_parameter("teleop_axis_linear_z").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_axis_linear_z: %d", _axis_linear_z);
+
+	this->declare_parameter("teleop_axis_angular_z", 3);
+	_axis_angular_z = this->get_parameter("teleop_axis_angular_z").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_axis_angular_z: %d", _axis_angular_z);
+
+	this->declare_parameter("teleop_button_enable", 4);
+	_button_enable = this->get_parameter("teleop_button_enable").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_button_enable: %d", _button_enable);
+
+	this->declare_parameter("teleop_button_arm", 0);
+	_button_arm = this->get_parameter("teleop_button_arm").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_button_arm: %d", _button_arm);
+
+	this->declare_parameter("teleop_button_takeoff", 3);
+	_button_takeoff = this->get_parameter("teleop_button_takeoff").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_button_takeoff: %d", _button_takeoff);
+
+	this->declare_parameter("teleop_button_land", 1);
+	_button_land = this->get_parameter("teleop_button_land").as_int();
+	RCLCPP_INFO(get_logger(), "teleop_button_land: %d", _button_land);
+
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
@@ -312,11 +357,86 @@ void OffboardControl::offboard_callback() {
 		this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
 
+	if (_teleop_active) {
+		// In teleop mode: update _x, _xd, _xdd from teleop variables
+		// Position
+		_x.pose.position.x = _teleop_position(0);
+		_x.pose.position.y = _teleop_position(1);
+		_x.pose.position.z = _teleop_position(2);
+		
+		// Orientation from yaw
+		matrix::Quaternionf q_target(matrix::Eulerf(0, 0, _teleop_yaw));
+		_x.pose.orientation.w = q_target(0);
+		_x.pose.orientation.x = q_target(1);
+		_x.pose.orientation.y = q_target(2);
+		_x.pose.orientation.z = q_target(3);
+		
+		// Velocity
+		_xd.twist.linear.x = _teleop_velocity(0);
+		_xd.twist.linear.y = _teleop_velocity(1);
+		_xd.twist.linear.z = _teleop_velocity(2);
+		_xd.twist.angular.x = 0.0;
+		_xd.twist.angular.y = 0.0;
+		_xd.twist.angular.z = _teleop_yawspeed;
+		
+		// Acceleration (zero per ora)
+		_xdd.accel.linear.x = 0.0;
+		_xdd.accel.linear.y = 0.0;
+		_xdd.accel.linear.z = 0.0;
+		_xdd.accel.angular.x = 0.0;
+		_xdd.accel.angular.y = 0.0;
+		_xdd.accel.angular.z = 0.0;
+		
+		// Salva la posizione teleop corrente per continuità - ma solo se teleop è stabile
+		// Questo evita conflitti durante la transizione
+		_prev_sp = _teleop_position;
+		_prev_yaw_sp = _teleop_yaw;
+		_prev_att_sp = q_target;
+	} else {
+		// Normal trajectory mode: get values from trajectory planner
+		if (_trajectory.isReady()) {
+			// Se c'è una traiettoria attiva, usala
+			_trajectory.getNext(_x,_xd,_xdd);
+			
+			// Aggiorna _prev_sp con la posizione corrente della traiettoria
+			// Questo ci assicura che quando la traiettoria finisce, _prev_sp sia aggiornato
+			_prev_sp(0) = _x.pose.position.x;
+			_prev_sp(1) = _x.pose.position.y;
+			_prev_sp(2) = _x.pose.position.z;
+			_prev_att_sp(0) = _x.pose.orientation.w;
+			_prev_att_sp(1) = _x.pose.orientation.x;
+			_prev_att_sp(2) = _x.pose.orientation.y;
+			_prev_att_sp(3) = _x.pose.orientation.z;
+			_prev_yaw_sp = matrix::Eulerf(_prev_att_sp).psi();
+		} else {
+			// Se non c'è traiettoria attiva, mantieni la posizione corrente (_prev_sp)
+			// Questo evita di pubblicare vecchi setpoint durante l'attesa dell'input utente
+			_x.pose.position.x = _prev_sp(0);
+			_x.pose.position.y = _prev_sp(1);
+			_x.pose.position.z = _prev_sp(2);
+			_x.pose.orientation.w = _prev_att_sp(0);
+			_x.pose.orientation.x = _prev_att_sp(1);
+			_x.pose.orientation.y = _prev_att_sp(2);
+			_x.pose.orientation.z = _prev_att_sp(3);
+			
+			// Velocità e accelerazione zero quando non c'è traiettoria attiva
+			_xd.twist.linear.x = 0.0;
+			_xd.twist.linear.y = 0.0;
+			_xd.twist.linear.z = 0.0;
+			_xd.twist.angular.x = 0.0;
+			_xd.twist.angular.y = 0.0;
+			_xd.twist.angular.z = 0.0;
+			
+			_xdd.accel.linear.x = 0.0;
+			_xdd.accel.linear.y = 0.0;
+			_xdd.accel.linear.z = 0.0;
+			_xdd.accel.angular.x = 0.0;
+			_xdd.accel.angular.y = 0.0;
+			_xdd.accel.angular.z = 0.0;
+		}
+	}
 
-	_trajectory.getNext(_x,_xd,_xdd);
-
-	// offboard_control_mode needs to be paired with trajectory_setpoint
-	// publish_offboard_control_mode();
+	// Always publish trajectory setpoint (unified for both modes)
 	publish_trajectory_setpoint();
 
 	// stop the counter after reaching 11
@@ -374,9 +494,42 @@ void OffboardControl::move_cmd(){
 			_replan_cnt = 0;
 			_last_cmd = cmd;
 
+			// Disattiva teleop se era attivo e viene inserito un nuovo comando
+			if (_teleop_active && cmd != "teleop") {
+				_teleop_active = false;
+				RCLCPP_INFO(this->get_logger(), "Exiting teleop mode due to new command from manager: %s", cmd.c_str());
+				
+				// Aspetta che il thread teleop finisca completamente per evitare conflitti
+				usleep(0.1e6); // 100ms per permettere al thread teleop di uscire
+				
+				// Forza l'aggiornamento di _prev_sp con l'ultima posizione teleop
+				_prev_sp = _teleop_position;
+				_prev_yaw_sp = _teleop_yaw;
+				_prev_att_sp = matrix::Quaternionf(matrix::Eulerf(0, 0, _teleop_yaw));
+				
+				// Sincronizza anche _x con la posizione finale del teleop per evitare salti
+				_x.pose.position.x = _teleop_position(0);
+				_x.pose.position.y = _teleop_position(1);
+				_x.pose.position.z = _teleop_position(2);
+				_x.pose.orientation.w = _prev_att_sp(0);
+				_x.pose.orientation.x = _prev_att_sp(1);
+				_x.pose.orientation.y = _prev_att_sp(2);
+				_x.pose.orientation.z = _prev_att_sp(3);
+			}
+
 			this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 
-			if(cmd =="nav"){			
+			if(cmd == "go") {
+				RCLCPP_INFO(this->get_logger(),"GO command received: [%.2f, %.2f, %.2f]", sp(0), sp(1), sp(2));
+				
+				compute_time_and_heading(sp, yaw_d, yaw_time, duration);
+
+				_replan = false;
+				_stop_trajectory = false; 
+				start_traj(_prev_sp, yaw_d, yaw_time);
+				start_traj(sp, yaw_d, duration);
+			}
+			else if(cmd =="nav"){			
 
 				do{
 					_replan = true;
@@ -432,6 +585,12 @@ void OffboardControl::move_cmd(){
 								
 								start_traj(_prev_sp, yaw_d, yaw_time);  //Blocking
 								start_traj(sp_odom, yaw_d, duration);	
+								
+								// Aggiorna _prev_sp dopo aver completato il segmento
+								_prev_sp = sp_odom;
+								_prev_att_sp = matrix::Quaternionf(matrix::Eulerf(0, 0, yaw_d));
+								_prev_yaw_sp = yaw_d;
+								
 								*id_wp_ptr = wp_index;
 								wp_index++;
 
@@ -498,6 +657,17 @@ void OffboardControl::move_cmd(){
 				#endif
 				stop_traj();
 				_status = "STOPPED";
+			}else if(cmd == "teleop") {
+				if (!_joy_available) {
+					RCLCPP_ERROR(this->get_logger(), "TELEOP command rejected - Joy node not available!");
+					RCLCPP_ERROR(this->get_logger(), "Please make sure joy_node is running and publishing to /joy topic");
+					continue;
+				}
+				
+				RCLCPP_INFO(this->get_logger(),"TELEOP command received from manager - entering teleop mode");
+				
+				// Lancia teleop in un thread separato per non bloccare move_cmd
+				boost::thread teleop_thread(&OffboardControl::teleop_mode, this);
 			}
 			
 		}
@@ -519,8 +689,31 @@ void OffboardControl::key_input() {
 	}
 
 	while(!exit && rclcpp::ok()) {
-		std::cout << "Enter command [arm | takeoff | go | nav | land | term | stop]: \n"; 
+		std::cout << "Enter command [arm | takeoff | go | nav | land | term | stop | teleop]: \n"; 
 		std::cin >> cmd;
+
+		// Disattiva teleop se era attivo e viene inserito un nuovo comando
+		if (_teleop_active && cmd != "teleop") {
+			_teleop_active = false;
+			RCLCPP_INFO(this->get_logger(), "Exiting teleop mode due to new command: %s", cmd.c_str());
+			
+			// Aspetta che il thread teleop finisca completamente per evitare conflitti
+			usleep(0.1e6); // 100ms per permettere al thread teleop di uscire
+			
+			// Forza l'aggiornamento di _prev_sp con l'ultima posizione teleop
+			_prev_sp = _teleop_position;
+			_prev_yaw_sp = _teleop_yaw;
+			_prev_att_sp = matrix::Quaternionf(matrix::Eulerf(0, 0, _teleop_yaw));
+			
+			// Sincronizza anche _x con la posizione finale del teleop per evitare salti
+			_x.pose.position.x = _teleop_position(0);
+			_x.pose.position.y = _teleop_position(1);
+			_x.pose.position.z = _teleop_position(2);
+			_x.pose.orientation.w = _prev_att_sp(0);
+			_x.pose.orientation.x = _prev_att_sp(1);
+			_x.pose.orientation.y = _prev_att_sp(2);
+			_x.pose.orientation.z = _prev_att_sp(3);
+		}
 
 		_last_cmd = cmd;
 		this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
@@ -606,6 +799,11 @@ void OffboardControl::key_input() {
 						start_traj(_prev_sp, yaw_d, yaw_time);  //Blocking
 						start_traj(sp_odom, yaw_d, duration);	
 						
+						// Update _prev_sp for next segment
+						_prev_sp = sp_odom;
+						_prev_att_sp = matrix::Quaternionf(matrix::Eulerf(0, 0, yaw_d));
+						_prev_yaw_sp = yaw_d;
+						
 						*id_wp_ptr = wp_index;
 						wp_index++;
 
@@ -667,6 +865,20 @@ void OffboardControl::key_input() {
 			stop_traj();
 			_status = "STOPPED";
 
+		}else if(cmd == "teleop") {
+			if (!_joy_available) {
+				RCLCPP_ERROR(this->get_logger(), "TELEOP command rejected - Joy node not available!");
+				RCLCPP_ERROR(this->get_logger(), "Please make sure joy_node is running and publishing to /joy topic");
+				continue;
+			}
+			
+			RCLCPP_INFO(this->get_logger(),"TELEOP command received - entering teleop mode");
+			std::cout << "Entering teleop mode. Use joystick to control the drone.\n";
+			std::cout << "To exit teleop mode, enter any other command (arm, takeoff, go, nav, land, term, stop).\n";
+			
+			// Lancia teleop in un thread separato per non bloccare key_input
+			boost::thread teleop_thread(&OffboardControl::teleop_mode, this);
+		
 		}else {
 			std::cout << "Unknown command;\n";
 
@@ -885,12 +1097,20 @@ void OffboardControl::start_traj(matrix::Vector3f pos, float yaw, double d) {
 
 	matrix::Quaternionf att(matrix::Eulerf(0, 0, yaw));
 
+	// Se START_FROM_LAST_MEAS è attivo, usa sempre la posizione corrente
 	if(START_FROM_LAST_MEAS){
 		_prev_sp = _position;
 		_prev_att_sp = _attitude;
 		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
 	}
-
+	// Se _prev_sp non è valido, usa la posizione corrente
+	else if(std::isnan(_prev_sp(0)) || std::isnan(_prev_sp(1)) || std::isnan(_prev_sp(2))) {
+		RCLCPP_WARN(this->get_logger(), "Previous setpoint invalid, using current position");
+		_prev_sp = _position;
+		_prev_att_sp = _attitude;
+		_prev_yaw_sp = matrix::Eulerf(_attitude).psi();
+	}
+	// Altrimenti usa _prev_sp esistente (già aggiornato dal teleop)
 
 	/* */
 	p.pose.position.x = _prev_sp(0);
@@ -917,14 +1137,13 @@ void OffboardControl::start_traj(matrix::Vector3f pos, float yaw, double d) {
 	p.pose.orientation.y = att(2);
 	p.pose.orientation.z = att(3);
 
-
-	_prev_sp = pos;
-	_prev_att_sp = att;
-	_prev_yaw_sp = matrix::Eulerf(att).psi();
+	// NON aggiorniamo _prev_sp qui - lo faremo quando la traiettoria sarà completata
+	// _prev_sp = pos;
+	// _prev_att_sp = att;
+	// _prev_yaw_sp = matrix::Eulerf(att).psi();
 
 	poses.push_back(p);
 	times.push_back(d);
-
 
 	_trajectory.set_waypoints(poses, times);
 
@@ -1215,6 +1434,107 @@ void OffboardControl::stop_traj(){
 	#endif
 }
 
+void OffboardControl::teleop_mode() {
+	_teleop_active = true;
+	
+	// Initialize teleop position from current position
+	_teleop_position = _position;
+	_teleop_yaw = matrix::Eulerf(_attitude).psi();
+	_teleop_velocity = matrix::Vector3f(0.0f, 0.0f, 0.0f);
+	_teleop_yawspeed = 0.0f;
+	
+	RCLCPP_INFO(this->get_logger(), "Teleop mode active - use joystick to control the drone");
+		
+	// Integration loop for teleop velocities - solo integrazione, pubblicazione gestita da offboard_callback
+	rclcpp::Rate rate(20); // 20 Hz per integrazione velocità
+	
+	while(_teleop_active && rclcpp::ok()) {
+		// Integra velocità per ottenere posizione target
+		float dt = 0.05f; // 20Hz
+		
+		_teleop_position += _teleop_velocity * dt;
+		_teleop_yaw += _teleop_yawspeed * dt;
+		
+		// Normalizza yaw
+		while (_teleop_yaw > M_PI) _teleop_yaw -= 2.0f * M_PI;
+		while (_teleop_yaw < -M_PI) _teleop_yaw += 2.0f * M_PI;
+		
+		// Aggiorna continuamente il setpoint precedente con la posizione teleop corrente
+		// Questo assicura che quando usciamo dal teleop, le nuove traiettorie partano dalla posizione corretta
+		_prev_sp = _teleop_position;
+		_prev_yaw_sp = _teleop_yaw;
+		
+		// Aggiorna anche l'attitude precedente basata sul nuovo yaw
+		matrix::Quaternionf teleop_att(matrix::Eulerf(0, 0, _teleop_yaw));
+		_prev_att_sp = teleop_att;
+		
+		rate.sleep();
+		
+		// Check for exit condition - quando arriva un nuovo comando o il nodo si ferma
+		if (!rclcpp::ok()) {
+			_teleop_active = false;
+		}
+	}
+	
+	// Quando usciamo dal teleop, assicuriamoci che i setpoint precedenti siano aggiornati
+	// con l'ultima posizione raggiunta durante il teleop
+	_prev_sp = _teleop_position;
+	_prev_yaw_sp = _teleop_yaw;
+	_prev_att_sp = matrix::Quaternionf(matrix::Eulerf(0, 0, _teleop_yaw));
+	
+	// Aggiorna anche le variabili del trajectory system per continuità
+	_x.pose.position.x = _teleop_position(0);
+	_x.pose.position.y = _teleop_position(1);
+	_x.pose.position.z = _teleop_position(2);
+	_x.pose.orientation.w = _prev_att_sp(0);
+	_x.pose.orientation.x = _prev_att_sp(1);
+	_x.pose.orientation.y = _prev_att_sp(2);
+	_x.pose.orientation.z = _prev_att_sp(3);
+	
+	RCLCPP_INFO(this->get_logger(), "Exiting teleop mode");
+}
+
+void OffboardControl::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+	// Attiva il flag joy_available al primo messaggio ricevuto
+	if (!_joy_available) {
+		_joy_available = true;
+		RCLCPP_INFO(this->get_logger(), "Joy node detected - teleop functionality enabled");
+	}
+	
+	if (!_teleop_active || !_first_odom) return;
+	
+	// Verifica che il joystick abbia abbastanza assi (almeno 4: 0,1,2,3)
+	if (msg->axes.size() < 4) {
+		RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+			"Joystick doesn't have enough axes (need at least 4, got %zu)", msg->axes.size());
+		return;
+	}
+	
+	// Calcolo velocità target dai comandi joystick - mapping corretto per il tuo joystick
+	float vx = msg->axes[3] * _teleop_max_vel * 0.5f;     // axis 3 -> X velocity (ridotta)
+	float vy = msg->axes[2] * _teleop_max_vel * 0.5f;     // axis 2 -> Y velocity (ridotta)  
+	float vz = msg->axes[1] * _teleop_max_vel * 0.5f;     // axis 1 -> Z velocity (normale, ridotta)
+	
+	_teleop_velocity(0) = vx;
+	_teleop_velocity(1) = vy;
+	_teleop_velocity(2) = vz;
+	
+	// Yaw rate - axis 0 (velocità normale)
+	_teleop_yawspeed = msg->axes[0] * _teleop_max_yaw_rate;
+	
+	// Debug info (throttled to avoid spam)
+	RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+		"Joy axes: [0]=%.2f, [1]=%.2f, [2]=%.2f, [3]=%.2f -> vx=%.2f, vy=%.2f, vz=%.2f, yaw_rate=%.2f",
+		msg->axes[0], msg->axes[1], msg->axes[2], msg->axes[3],
+		vx, vy, vz, _teleop_yawspeed);
+	
+	// Deadband per evitare drift
+	float deadband = 0.05f;
+	if (std::abs(_teleop_velocity(0)) < deadband) _teleop_velocity(0) = 0.0f;
+	if (std::abs(_teleop_velocity(1)) < deadband) _teleop_velocity(1) = 0.0f;
+	if (std::abs(_teleop_velocity(2)) < deadband) _teleop_velocity(2) = 0.0f;
+	if (std::abs(_teleop_yawspeed) < deadband) _teleop_yawspeed = 0.0f;
+}
 
 
 int main(int argc, char* argv[]) {

@@ -20,10 +20,11 @@ windows:
         - sleep 5  
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 launch trajectory_planner rtabmap_sim.launch.py
-#    - shell_command:
-#        - sleep 5  
-#        - cd ~/ros2_ws && source install/setup.bash
-#        #- ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
+    - shell_command:
+       - sleep 5  
+       - cd ~/ros2_ws && source install/setup.bash
+    #    - ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
+       - ros2 run joy joy_node 
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
@@ -58,4 +59,9 @@ windows:
     - shell_command:
         - sleep 30
         - cd ~/ros2_ws && source install/setup.bash
-        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" 
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" # to takeoff
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" # X is a number 1-7
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}" # to trigger teleoperation 
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"  # to land
+
+
