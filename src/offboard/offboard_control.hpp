@@ -224,6 +224,7 @@ private:
 	std::string _parent_transf;
 	std::string _child_transf;
 	std::string _check_frame_id;
+	double _tf_buffer_timeout;  // Timeout for TF lookups
 
 	// Teleop variables
 	bool _teleop_active{false};

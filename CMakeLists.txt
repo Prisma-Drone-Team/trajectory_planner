@@ -72,7 +72,7 @@ install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
 
 add_executable(move_manager_node src/move_manager_node.cpp)
-ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs nav_msgs Boost tf2 tf2_ros)
+ament_target_dependencies(move_manager_node rclcpp std_msgs geometry_msgs px4_msgs nav_msgs Boost tf2 tf2_ros tf2_geometry_msgs)
 install(TARGETS move_manager_node DESTINATION lib/${PROJECT_NAME})
 
 # Teleop node

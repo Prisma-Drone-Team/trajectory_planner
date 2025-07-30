@@ -46,6 +46,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	RCLCPP_INFO(get_logger(), "plan_status_topic: %s", _plan_status_topic.c_str());
 
 
+	this->declare_parameter("tf_buffer_timeout", 0.5);
+	_tf_buffer_timeout = this->get_parameter("tf_buffer_timeout").as_double();
+	RCLCPP_INFO(get_logger(), "tf_buffer_timeout: %.2f", _tf_buffer_timeout);
+
 	this->declare_parameter("parent_transform", "map");
 	_parent_transf = this->get_parameter("parent_transform").as_string();
 	RCLCPP_INFO(get_logger(), "parent_transform: %s", _parent_transf.c_str());
@@ -310,8 +314,12 @@ void OffboardControl::tf_lookup_loop() {
 	rclcpp::Rate rate(100);
 	while (rclcpp::ok()) {
 		try {
-			_tf_map_to_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, tf2::TimePointZero);
-			_tf_odom_to_map = tf_buffer_->lookupTransform(_parent_transf, _child_transf, tf2::TimePointZero);
+			rclcpp::Time now = this->get_clock()->now();
+			rclcpp::Duration timeout = rclcpp::Duration::from_seconds(_tf_buffer_timeout);  // timeout for waiting
+			_tf_map_to_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, now, timeout);
+			_tf_odom_to_map = tf_buffer_->lookupTransform(_parent_transf, _child_transf, now, timeout);
+			// _tf_map_to_odom = tf_buffer_->lookupTransform(_child_transf, _parent_transf, tf2::TimePointZero);
+			// _tf_odom_to_map = tf_buffer_->lookupTransform(_parent_transf, _child_transf, tf2::TimePointZero);
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
 		}

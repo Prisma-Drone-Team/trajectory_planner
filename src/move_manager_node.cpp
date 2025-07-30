@@ -19,6 +19,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2/exceptions.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include "trajectory_planner/msg/move_cmd.hpp"
 
@@ -32,10 +33,6 @@ public:
     MoveManager() : Node("MoveManagerNode")
     {
         RCLCPP_INFO(this->get_logger(), "Move Manager node started, ready to send signals");
-
-        this->declare_parameter("do_transform", 0.0);
-        _do_transform = this->get_parameter("do_transform").as_double(); // as_bool not working
-        RCLCPP_INFO(get_logger(), "do_transform: %f", _do_transform);
 
         // Configure QoS per ros2
         rclcpp::QoS qos(rclcpp::KeepLast(1));
@@ -58,18 +55,44 @@ public:
 
         if (SIMULATION)
         {
-            _odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-                    "/fmu/out/vehicle_odometry", qos_px4,
-                    [this](px4_msgs::msg::VehicleOdometry::UniquePtr msg) {
-                        // Store latest odometry message (protect with mutex)
-                        boost::mutex::scoped_lock lock(_odom_mutex);
-                        _last_odometry_msg = std::move(msg);
-                    });
+            // Timer per tf publishing a 100Hz
+            _tf_timer = this->create_wall_timer(10ms, std::bind(&MoveManager::timerTfCallback, this));
+
+            auto qos_odom = rclcpp::QoS(rclcpp::KeepLast(10)).reliability(rclcpp::ReliabilityPolicy::BestEffort);
+
+            _odometry_sub = this->create_subscription<nav_msgs::msg::Odometry>("/model/x500_depth_0/odometry", qos_odom,
+                [this](const nav_msgs::msg::Odometry::UniquePtr msg) {
+
+                    //this->staticTfPub(); // CHECK IF NEEDED
+
+                    // Prepare the TransformStamped message
+                    geometry_msgs::msg::TransformStamped transform_stamped;
+                    
+                    // Set the header
+                    transform_stamped.header.stamp = msg->header.stamp; // 
+                    transform_stamped.header.frame_id = "odom";  // Set to appropriate frame (ENU)
+                    transform_stamped.child_frame_id = "base_link";  // Set to appropriate frame
+
+                    // Set translation (position)
+                    transform_stamped.transform.translation.x = msg->pose.pose.position.x;
+                    transform_stamped.transform.translation.y = msg->pose.pose.position.y;
+                    transform_stamped.transform.translation.z = msg->pose.pose.position.z;
+
+                    transform_stamped.transform.rotation.x = msg->pose.pose.orientation.x;
+                    transform_stamped.transform.rotation.y = msg->pose.pose.orientation.y;
+                    transform_stamped.transform.rotation.z = msg->pose.pose.orientation.z;
+                    transform_stamped.transform.rotation.w = msg->pose.pose.orientation.w   ;
+
+
+                    // Broadcast the transform
+                    _tf_broadcaster->sendTransform(transform_stamped);
+
+                  
+
+            });
         }
 
-        _pdt_sub = this->create_subscription<std_msgs::msg::String>(
-                                                "/seed_pdt_drone/command", 1,
-                                                std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
+        _pdt_sub = this->create_subscription<std_msgs::msg::String>("/seed_pdt_drone/command", 1, std::bind(&MoveManager::pdt_callback, this, std::placeholders::_1));
 
         _plan_status_sub =
                 this->create_subscription<std_msgs::msg::String>(
@@ -88,8 +111,6 @@ public:
                             }
                         });
 
-        // Timer per tf publishing a 100Hz
-        _tf_timer = this->create_wall_timer(10ms, std::bind(&MoveManager::timerTfCallback, this));
 
         // Publisher pdt status
         _pdt_publisher = this->create_publisher<std_msgs::msg::String>("/seed_pdt_drone/status", 1);
@@ -110,95 +131,79 @@ public:
                                 cmd.c_str(), pose.position.x, pose.position.y, pose.position.z);
     }
 
-    // Timer callback per inviare le trasformazioni tf a 100Hz
+    // // Timer callback per inviare le trasformazioni tf a 100Hz
     void timerTfCallback()
     {
         // Pubblica il dynamic tf se abbiamo ricevuto odometria
-        {
-            boost::mutex::scoped_lock lock(_odom_mutex);
-            if (_last_odometry_msg)
-            {
-                geometry_msgs::msg::TransformStamped transform_stamped;
-                transform_stamped.header.stamp = this->get_clock()->now();
-                transform_stamped.header.frame_id = "odomNED"; // come nella versione originale
-                transform_stamped.child_frame_id = "base_link_FRD";
-                transform_stamped.transform.translation.x = _last_odometry_msg->position[0];
-                transform_stamped.transform.translation.y = _last_odometry_msg->position[1];
-                transform_stamped.transform.translation.z = _last_odometry_msg->position[2];
-                transform_stamped.transform.rotation.x = _last_odometry_msg->q.data()[1];
-                transform_stamped.transform.rotation.y = _last_odometry_msg->q.data()[2];
-                transform_stamped.transform.rotation.z = _last_odometry_msg->q.data()[3];
-                transform_stamped.transform.rotation.w = _last_odometry_msg->q.data()[0];
-                _tf_broadcaster->sendTransform(transform_stamped);
-            }
-        }
+        // {
+        //     boost::mutex::scoped_lock lock(_odom_mutex);
+        //     if (_last_odometry_msg)
+        //     {
+        //         geometry_msgs::msg::TransformStamped transform_stamped;
+        //         transform_stamped.header.stamp = this->get_clock()->now();
+        //         transform_stamped.header.frame_id = "odomNED"; // come nella versione originale
+        //         transform_stamped.child_frame_id = "base_link_FRD";
+        //         transform_stamped.transform.translation.x = _last_odometry_msg->position[0];
+        //         transform_stamped.transform.translation.y = _last_odometry_msg->position[1];
+        //         transform_stamped.transform.translation.z = _last_odometry_msg->position[2];
+        //         transform_stamped.transform.rotation.x = _last_odometry_msg->q.data()[1];
+        //         transform_stamped.transform.rotation.y = _last_odometry_msg->q.data()[2];
+        //         transform_stamped.transform.rotation.z = _last_odometry_msg->q.data()[3];
+        //         transform_stamped.transform.rotation.w = _last_odometry_msg->q.data()[0];
+        //         _tf_broadcaster->sendTransform(transform_stamped);
+        //     }
+        // }
         // Pubblica le static tf
         staticTfPub();
     }
 
     // Funzione per le static transforms
-    void staticTfPub()
-    {
-        if(_do_transform){
-            geometry_msgs::msg::TransformStamped t;
-            t.header.stamp = this->get_clock()->now();
-            t.header.frame_id = "odom";
-            t.child_frame_id = "odomNED";
-            t.transform.translation.x = 0.0;
-            t.transform.translation.y = 0.0;
-            t.transform.translation.z = 0.0;
-            t.transform.rotation.x = 0.7071068;
-            t.transform.rotation.y = 0.7071068;
-            t.transform.rotation.z = 0.0;
-            t.transform.rotation.w = 0.0;
-            _static_tf_broadcaster->sendTransform(t);
+    void staticTfPub(){
 
-            geometry_msgs::msg::TransformStamped t2;
-            t2.header.stamp = this->get_clock()->now();
-            t2.header.frame_id = "base_link_FRD";
-            t2.child_frame_id = "base_link";
-            t2.transform.translation.x = 0.0;
-            t2.transform.translation.y = 0.0;
-            t2.transform.translation.z = 0.0;
-            t2.transform.rotation.x = 1.0;
-            t2.transform.rotation.y = 0.0;
-            t2.transform.rotation.z = 0.0;
-            t2.transform.rotation.w = 0.0;
-            _static_tf_broadcaster->sendTransform(t2);
+        geometry_msgs::msg::TransformStamped t;
+        t.header.stamp = this->get_clock()->now();
+        t.header.frame_id = "base_link";
+        t.child_frame_id = "x500_depth_0/OakD-Lite/base_link/IMX214";
 
-            geometry_msgs::msg::TransformStamped t3;
-            t3.header.stamp = this->get_clock()->now();
-            t3.header.frame_id = "base_link";
-            t3.child_frame_id = "x500_depth_0/OakD-Lite/base_link/StereoOV7251";
-            t3.transform.translation.x = 0.15;
-            t3.transform.translation.y = 0.03;
-            t3.transform.translation.z = -0.202;
-            t3.transform.rotation.x = -0.5;
-            t3.transform.rotation.y = 0.5;
-            t3.transform.rotation.z = -0.5;
-            t3.transform.rotation.w = 0.5;
-            _static_tf_broadcaster->sendTransform(t3);
+        t.transform.translation.x = 0.15;
+        t.transform.translation.y = 0.03;
+        t.transform.translation.z = 0.202;
 
-            geometry_msgs::msg::TransformStamped t4;
-            t4.header.stamp = this->get_clock()->now();
-            t4.header.frame_id = "base_link";
-            t4.child_frame_id = "x500_depth_0/OakD-Lite/base_link/IMX214";
-            t4.transform.translation.x = 0.15;
-            t4.transform.translation.y = 0.03;
-            t4.transform.translation.z = -0.202;
-            t4.transform.rotation.x = -0.5;
-            t4.transform.rotation.y = 0.5;
-            t4.transform.rotation.z = -0.5;
-            t4.transform.rotation.w = 0.5;
-            _static_tf_broadcaster->sendTransform(t4);
-        }
+        tf2::Quaternion q;
+        q.setRPY(-1.5707, 0, -1.5707);
+        t.transform.rotation.x = q.x();
+        t.transform.rotation.y = q.y();
+        t.transform.rotation.z = q.z();
+        t.transform.rotation.w = q.w();
+        _static_tf_broadcaster->sendTransform(t);
+
+
+        t.header.stamp = this->get_clock()->now();
+        t.header.frame_id = "base_link";
+        t.child_frame_id = "base_link_FRD";
+
+        t.transform.translation.x = 0.0;
+        t.transform.translation.y = 0.0;
+        t.transform.translation.z = 0.0;
+
+        t.transform.rotation.x = -1.0;
+        t.transform.rotation.y = 0.;
+        t.transform.rotation.z = 0.0;
+        t.transform.rotation.w = 0.0;
+
+        _static_tf_broadcaster->sendTransform(t);
+
+        
     }
 
     bool checkTransform(const std::string &frame_name, geometry_msgs::msg::Pose &pose)
     {
         geometry_msgs::msg::TransformStamped tf_appr;
         try
-        {
+        {   
+            // rclcpp::Time now = this->get_clock()->now();
+            // rclcpp::Duration timeout = rclcpp::Duration::from_seconds(0.5);  // timeout for waiting
+            // tf_appr = _pdt_tf_buffer->lookupTransform("map", frame_name, now, timeout); 
             tf_appr = _pdt_tf_buffer->lookupTransform("map", frame_name, tf2::TimePointZero);
             pose.position.x = tf_appr.transform.translation.x;
             pose.position.y = tf_appr.transform.translation.y;
@@ -416,7 +421,7 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr _odom_publisher;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _pdt_publisher;
 
-    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odometry_sub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odometry_sub;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr _plan_status_sub;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr _pdt_sub;
 
@@ -432,7 +437,7 @@ private:
     std::string _received_command = "";
     std::string _current_command = "";
     std::string _plan_status = "";
-    double _do_transform;
+  
 
     // Mutex per proteggere l'ultimo messaggio di odometria
     boost::mutex _odom_mutex;

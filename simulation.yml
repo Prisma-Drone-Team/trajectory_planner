@@ -1,7 +1,7 @@
 session_name: simulation
 socket_name: drone
 environment:
-  ROS_DOMAIN_ID: "17"
+  ROS_DOMAIN_ID: "18"
 pre_window: 
 windows:
 - window_name: px4
@@ -11,20 +11,21 @@ windows:
         - cd ~/PX4-Autopilot
         - make px4_sitl gz_x500_depth
     - shell_command:
-        - sleep 5           
+        - sleep 1          
         - MicroXRCEAgent udp4 -p 8888
     - shell_command:
-        - sleep 5           
-        - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image  /model/x500_depth_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry 
+        - sleep 2           
+        - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image 
+          /model/x500_depth_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry  /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
     - shell_command:
         - sleep 5  
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner rtabmap_sim.launch.py
+        - ros2 launch trajectory_planner rtabmap_sim.launch.py 
     - shell_command:
-       - sleep 5  
-       - cd ~/ros2_ws && source install/setup.bash
-    #    - ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
-       - ros2 run joy joy_node 
+        - sleep 5  
+        - cd ~/ros2_ws && source install/setup.bash
+        # - ros2 run depth_image_proc point_cloud_xyz_node --ros-args -r image_rect:=/depth_camera 
+        # - ros2 run joy joy_node 
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
@@ -32,7 +33,7 @@ windows:
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner tf_static_sim.launch.py
+        - ros2 launch trajectory_planner tf_static_sim.launch.py use_sim_time:=true
 - window_name: rtabmap
   layout: tiled
   panes:
@@ -45,19 +46,19 @@ windows:
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 run trajectory_planner move_manager_node --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
     - shell_command:
-        - sleep 30
+        - sleep 20
         - cd ~/ros2_ws && source install/setup.bash
         - ros2 topic echo /leo/drone/plan_status
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 run plotjuggler plotjuggler
+        #- ros2 run plotjuggler plotjuggler
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        -  ros2 launch drone_odometry2 px4_tf_pub.launch.py 
+        - ros2 launch drone_odometry2 px4_tf_pub_simulation.launch.py use_sim_time:=true
     - shell_command:
-        - sleep 30
+        - sleep 1
         - cd ~/ros2_ws && source install/setup.bash
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" # to takeoff
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" # X is a number 1-7
