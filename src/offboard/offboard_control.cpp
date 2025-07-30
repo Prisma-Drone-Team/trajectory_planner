@@ -826,7 +826,7 @@ void OffboardControl::key_input() {
 			}
 
 		}
-		else if(cmd == "takeoff") {
+		else if(cmd == "takeoff") { // rotate takeoff land and go from map to odom
 
 			sp = _position;
 			std::cout << "Enter takeoff altitude (ENU frame): "; 

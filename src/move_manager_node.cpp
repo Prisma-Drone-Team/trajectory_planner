@@ -336,6 +336,29 @@ public:
                         RCLCPP_INFO(this->get_logger(), "NAV command sent");
                     }
                 }
+                else if (cv[0] == "go")
+                {
+                    // Parsing delle coordinate dal comando go(x,y,z)
+                    if (cv.size() >= 4)
+                    {
+                        try {
+                            sp.position.x = std::stod(cv[1]);
+                            sp.position.y = std::stod(cv[2]);
+                            sp.position.z = std::stod(cv[3]);
+                            _current_command = _received_command;
+                            cmd_to_send = "go";
+                            send_move_cmd(cmd_to_send, sp);
+                            RCLCPP_INFO(this->get_logger(), "GO command sent to coordinates: %.2f, %.2f, %.2f", 
+                                       sp.position.x, sp.position.y, sp.position.z);
+                        } catch (const std::exception& e) {
+                            RCLCPP_ERROR(this->get_logger(), "Invalid coordinates in go command: %s", e.what());
+                        }
+                    }
+                    else
+                    {
+                        RCLCPP_ERROR(this->get_logger(), "GO command requires 3 coordinates: go(x,y,z)");
+                    }
+                }
                 else if (cv[0] == "takeoff")
                 {
                     cmd_to_send = "arm";

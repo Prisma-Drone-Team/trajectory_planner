@@ -126,8 +126,18 @@ The system accepts these keyboard commands:
 ```bash
 # Basic commands
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}"
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'go(5.0,3.0,2.0)'}"
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" #X=1-7
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}"
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"
+```
+
+#### Command Types Explained
+- **`takeoff`** - Automated takeoff to 1.5m altitude
+- **`go(x,y,z)`** - Direct point-to-point flight to coordinates (ENU frame)
+- **`flyto(frame)`** - Navigate to TF frame with obstacle avoidance  
+- **`teleop`** - Enter joystick control mode (requires joy_node)
+- **`land`** - Automated landing procedure
 ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"
 ```
 
@@ -168,6 +178,46 @@ emergency_stop_decel: 3.0   # Emergency stop deceleration (m/s²)
 min_flight_height: 0.5      # Minimum flight altitude (m)
 ```
 
+## Command Reference
+
+### Move Manager Commands
+The system supports the following command formats via `/seed_pdt_drone/command` topic:
+
+#### Navigation Commands
+```bash
+# Direct coordinate navigation (point-to-point)
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'go(5.0,3.0,2.0)'}"
+
+# TF frame navigation (with obstacle avoidance)
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goal1)'}"
+```
+
+#### Flight Control Commands
+```bash
+# Takeoff to 1.5m altitude
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}"
+
+# Landing procedure
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"
+
+# Enter teleoperation mode
+ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}"
+```
+
+#### Command Processing
+- **Validation**: All commands are validated for syntax and parameters
+- **Coordinate System**: Uses ENU (East-North-Up) coordinate frame
+- **Safety Checks**: Commands are queued and processed safely
+- **Status Feedback**: Command status available via `/leo/drone/plan_status`
+
+### Navigation Types Comparison
+
+| Command Type | Use Case | Path Planning | Obstacle Avoidance |
+|--------------|----------|---------------|-------------------|
+| `go(x,y,z)` | Direct flight | Spline trajectory | ❌ |
+| `flyto(frame)` | Landmark navigation | OMPL planning | ✅ |
+| Keyboard `nav` | Interactive waypoints | OMPL planning | ✅ |
+
 ## Architecture
 
 ### Core Components
@@ -181,10 +231,14 @@ Main control node that handles:
 
 #### MoveManagerNode
 Command interface that:
-- Processes external commands
-- Validates command parameters
-- Forwards commands to OffboardControl
-- Maintains command history
+- Processes external commands via `/seed_pdt_drone/command` topic
+- Validates command parameters and coordinates
+- Forwards commands to OffboardControl via `/move_cmd` topic
+- Maintains command history and status monitoring
+- Supports multiple command formats:
+  - **Direct coordinates**: `go(x,y,z)` for point-to-point navigation
+  - **TF frames**: `flyto(frame)` for landmark-based navigation
+  - **Simple commands**: `takeoff`, `land`, `teleop`
 
 ### Control Flow
 ```
