@@ -46,7 +46,7 @@ offboard_control:
     parent_transform: "map"
     child_transform: "odom"
     do_transform: 1.0 # BOOL
-    check_frame_id: "odom" # Frame ID for the check marker
+    check_frame_id: "map" # Frame ID for the check marker
     
     # Teleop parameters
     teleop_max_vel: 2.0         # Increased for better responsiveness

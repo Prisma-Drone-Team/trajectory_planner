@@ -56,7 +56,7 @@ windows:
     - shell_command:
         - sleep 5
         - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch drone_odometry2 px4_tf_pub.launch.py use_sim_time:=true
+        - ros2 launch drone_odometry2 px4_tf_pub_simulation.launch.py use_sim_time:=true
     - shell_command:
         - sleep 1
         - cd ~/ros2_ws && source install/setup.bash
