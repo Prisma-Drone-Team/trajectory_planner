@@ -1,6 +1,7 @@
-session_name: simulation
+session_name: babyk
 socket_name: drone
 environment:
+  ROS_DOMAIN_ID: "33"
 pre_window: 
 windows:
 - window_name: drone
@@ -8,18 +9,24 @@ windows:
   panes:
     - shell_command:
         - sleep 25
-        - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner tf_static_sim.launch.py
+        - cd ~/dev_ws && source install/setup.bash
     - shell_command:
         - sleep 25
-        - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch trajectory_planner rtabmap.launch.py
+        - cd ~/dev_ws && source install/setup.bash
+        - ros2 run trajectory_planner offboard_control --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
     - shell_command:
-        - sleep 25
-        - cd ~/ros2_ws && source install/setup.bash
-        - ros2 launch mavros px4.launch fcu_url:=/dev/ttyACM0:57600
+        - sleep 5
+        - cd ~/dev_ws && source install/setup.bash
+        - ros2 run trajectory_planner move_manager_node --ros-args --params-file /root/ros2_ws/src/pkg/trajectory_planner/config/sim_params.yaml
     - shell_command:
-        - cd ~/ros2_ws && source install/setup.bash
+        - sleep 20
+        - cd ~/dev_ws && source install/setup.bash
+        - ros2 topic echo /leo/drone/plan_status
     - shell_command:
-        - cd ~/ros2_ws && source install/setup.bash
-        
+        - cd ~/dev_ws && source install/setup.bash
+        #- ros2 run tf2_ros static_transform_publisher 1 0 1 0 0 1 map goal
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" # to takeoff
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'go(10.0,5.0,3.0)'}" # to plan without RRT and FCL
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" # X is a number 1-7
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}" # to trigger teleoperation 
+        #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"  # to land
