@@ -25,7 +25,7 @@
 
 using namespace std::chrono_literals;
 
-#define SIMULATION 1
+#define SIMULATION 0
 
 class MoveManager : public rclcpp::Node
 {

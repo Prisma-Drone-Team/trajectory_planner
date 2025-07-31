@@ -4,7 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #define START_FROM_LAST_MEAS 0
-#define SIMULATION 1
+#define SIMULATION 0
 
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
@@ -295,17 +295,17 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	// Start the TF lookup thread
 	boost::thread tf_lookup_t(&OffboardControl::tf_lookup_loop, this);
     
-	#ifdef SIMULATION
-		_T_enu_to_ned.setZero();
-		_T_enu_to_ned(0,1) =  1.0;
-		_T_enu_to_ned(1,0) =  1.0;
-		_T_enu_to_ned(2,2) = -1.0;
-	#else
-		_T_enu_to_ned.setZero();
-		_T_enu_to_ned(0,0) = 1.0;
-		_T_enu_to_ned(1,1) = -1.0;
-		_T_enu_to_ned(2,2) = -1.0;
-	#endif
+	// #ifdef SIMULATION
+	// 	_T_enu_to_ned.setZero();
+	// 	_T_enu_to_ned(0,1) =  1.0;
+	// 	_T_enu_to_ned(1,0) =  1.0;
+	// 	_T_enu_to_ned(2,2) = -1.0;
+	// #else
+	// 	_T_enu_to_ned.setZero();
+	// 	_T_enu_to_ned(0,0) = 1.0;
+	// 	_T_enu_to_ned(1,1) = -1.0;
+	// 	_T_enu_to_ned(2,2) = -1.0;
+	// #endif
 }
 
 void OffboardControl::tf_lookup_loop() {
@@ -448,7 +448,7 @@ void OffboardControl::offboard_callback() {
 	publish_trajectory_setpoint();
 
 	// stop the counter after reaching 11
-	if (_offboard_setpoint_counter < 11) {
+	if (_offboard_setpoint_counter < 25) {
 		_offboard_setpoint_counter++;
 	}
 
@@ -470,7 +470,7 @@ void OffboardControl::move_command_callback(const trajectory_planner::msg::MoveC
 	}
 
 	RCLCPP_INFO(get_logger(), "Command received: %s. Pose: %f,%f,%f", msg->command.data.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
-	
+	RCLCPP_INFO(get_logger(), "New command: %d ", _new_command);
 }
 
 void OffboardControl::move_cmd(){
@@ -538,8 +538,10 @@ void OffboardControl::move_cmd(){
 				start_traj(sp, yaw_d, duration);
 			}
 			else if(cmd =="nav"){			
+				RCLCPP_WARN(this->get_logger(), "enter while nav");
 
-				do{
+				do{	
+					RCLCPP_INFO(this->get_logger(), "In cnd nav");
 					_replan = true;
 					_wp_traj_completed = false;
 			
@@ -565,9 +567,10 @@ void OffboardControl::move_cmd(){
 						boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr); 
 
 						while(_wp_traj_completed == false && !_stop_trajectory ) {	
+							RCLCPP_INFO(this->get_logger(), "in while, _wp_traj_completed=%d",_wp_traj_completed); //CI VA
 							
 							if(!_replan && wp_index<int(opt_poses->size())){
-							
+							    RCLCPP_INFO(this->get_logger(), "after if"); // VI VA
 								sp(0) = (*opt_poses)[wp_index].position.x;
 								sp(1) = (*opt_poses)[wp_index].position.y;
 								sp(2) = (*opt_poses)[wp_index].position.z;    
@@ -610,6 +613,7 @@ void OffboardControl::move_cmd(){
 								break;
 							}
 						}
+						RCLCPP_WARN(this->get_logger(), "fuori while nav (traj pub)");
 					}else{
 						RCLCPP_WARN(this->get_logger(), "No valid path found for navigation command");
 					}
@@ -1316,7 +1320,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 }
 
 void OffboardControl::check_path(const std::vector<POSE> & poses, const std::shared_ptr<int> wp) {
-    
+    RCLCPP_INFO(get_logger(), "start check");
 	usleep(0.01e6);
 
     visualization_msgs::msg::Marker check_m;
@@ -1352,16 +1356,16 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 	Eigen::Vector3d pt_f;
 	bool valid_path = true;
 	double s[3]; //state
-	double step = 0.2;
+	double step = 0.05;
 	bool segment_checked = false;
 	bool trajetory_is_completed = false;
 
 
 	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
+		RCLCPP_INFO(get_logger(), "nel while grosso");
 
-		RCLCPP_INFO_ONCE(get_logger(), "Checking path");
 		if(*wp != 0){
-			RCLCPP_INFO(get_logger(), "wp not empty");
+			RCLCPP_INFO(get_logger(), "nell'if *wp!=0");
 
 			if(_do_transform){
 				matrix::Vector3f position;
@@ -1389,9 +1393,10 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 				pt_i << _position(0), _position(1), _position(2); 
 			}
 			
-			
-			for(int i=*wp ; i<poses.size(); i++ ) {
-				RCLCPP_INFO(get_logger(), "Checking wp %f", i);
+			RCLCPP_INFO(get_logger(), "START COLL CECK pose size= %d, wp= %d",poses.size(), *wp);
+
+			for(int i=*wp ; i<poses.size(); i++ ) { // dovrebbe essere <= perchè se rrt trova un solo punto non fa coll check. con 2 segmenti lo ha fatto.(goal molto vicino)
+				RCLCPP_INFO(get_logger(), "nel for wp"); // NON CI VA
 				pt_f << poses[i].position.x, poses[i].position.y, poses[i].position.z;
 				
 				dir = (pt_f - pt_i);
@@ -1401,7 +1406,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 				segment_checked = false;
 
     	        while( !segment_checked && valid_path) {
-
+					// RCLCPP_INFO(get_logger(), "while !seg_check"); // NON CI VA se 1 pt
 					pt_check += dir*step;
 					check_m.pose.position.x = pt_check[0];
 					check_m.pose.position.y = pt_check[1];
@@ -1413,18 +1418,22 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 					valid_path = _pp->check_state(s);
 
 					segment_checked = ((pt_check-pt_f).norm() < 2*step);
-					if( _rviz_output ) 
+					if( _rviz_output > 0.0 ) {
 						_check_path_pub->publish( check_m );
+						// RCLCPP_INFO(get_logger(), "pulish mark"); // NON CI VA se 1 pt
+					}
 				}
 				
 				pt_i = pt_f;
 
 				if(!valid_path) break;
+				RCLCPP_INFO(get_logger(), "pose size= %d, wp= %d",poses.size(), *wp);
 			}
-			_wp_traj_completed = (!_trajectory.isReady() && *wp == poses.size()-1);
+			_wp_traj_completed = (!_trajectory.isReady() && *wp == poses.size()-1); 
+			RCLCPP_INFO(get_logger(), "trajectory ended: %d, pose size= %d, wp= %d", _trajectory.isReady(), poses.size(), *wp);
 		}
 		
-		if( _wp_traj_completed ){
+		if(_wp_traj_completed ){
 
 			RCLCPP_INFO(get_logger(), "Checking path ENDED - Trajectory completed");
 		}
