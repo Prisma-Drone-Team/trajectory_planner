@@ -496,8 +496,8 @@ void OffboardControl::move_cmd(){
 			
 			RCLCPP_INFO(get_logger(), "Command accepted: %s. Pose: %f,%f,%f",_cmd.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
 			_new_command = false;
-			cmd = _cmd;
-			current_sp = _cmd_sp;
+			cmd = _cmd;           // received from the last callback
+			current_sp = _cmd_sp; // received from the last callback
 			sp = current_sp;
 			_replan_cnt = 0;
 			_last_cmd = cmd;
@@ -542,6 +542,7 @@ void OffboardControl::move_cmd(){
 				do{
 					_replan = true;
 					_wp_traj_completed = false;
+			
 					wp[0] = current_sp(0);
 					wp[1] = current_sp(1);
 					wp[2] = current_sp(2);
@@ -552,7 +553,7 @@ void OffboardControl::move_cmd(){
 					_stop_trajectory = false;
 
 					if(plan_has_result){
-
+						RCLCPP_INFO(this->get_logger(), "Path found with %zu waypoints", opt_poses->size());
 						_replan = false;
 
 						int wp_index = 1;
@@ -564,7 +565,7 @@ void OffboardControl::move_cmd(){
 						boost::thread check_path_t( &OffboardControl::check_path, this, poses_to_check, id_wp_ptr); 
 
 						while(_wp_traj_completed == false && !_stop_trajectory ) {	
-
+							
 							if(!_replan && wp_index<int(opt_poses->size())){
 							
 								sp(0) = (*opt_poses)[wp_index].position.x;
@@ -574,7 +575,7 @@ void OffboardControl::move_cmd(){
 								if(_do_transform){
 									geometry_msgs::msg::PointStamped point_in, point_out;
 									point_in.header.stamp = this->get_clock()->now();
-									point_in.header.frame_id = _parent_transf;
+									point_in.header.frame_id = _parent_transf; 
 									point_in.point.x = sp(0);
 									point_in.point.y = sp(1);
 									point_in.point.z = sp(2);
@@ -609,8 +610,11 @@ void OffboardControl::move_cmd(){
 								break;
 							}
 						}
+					}else{
+						RCLCPP_WARN(this->get_logger(), "No valid path found for navigation command");
 					}
 					std::cout<<"Replan: "<<_replan_cnt<<std::endl;
+
 				}while(_wp_traj_completed == false && _replan_cnt < _max_replan_iterations && !_stop_trajectory);
 
 			}
@@ -665,6 +669,7 @@ void OffboardControl::move_cmd(){
 				#endif
 				stop_traj();
 				_status = "STOPPED";
+
 			}else if(cmd == "teleop") {
 				if (!_joy_available) {
 					RCLCPP_ERROR(this->get_logger(), "TELEOP command rejected - Joy node not available!");
@@ -1175,10 +1180,12 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	}
 
 	matrix::Vector3f prev_sp_map;
+	matrix::Vector3f position;
+
 	if(_do_transform){
 		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
-		point_in.header.frame_id = _parent_transf;
+		point_in.header.frame_id = _child_transf;
 		point_in.point.x = _prev_sp(0);
 		point_in.point.y = _prev_sp(1);
 		point_in.point.z = _prev_sp(2);
@@ -1189,11 +1196,34 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 			prev_sp_map(2) = point_out.point.z;
 		} catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+			return false; // If transform fails, we cannot proceed
 		} 
-		}
-    s.position.x = prev_sp_map(0); 
-    s.position.y = prev_sp_map(1);
-    s.position.z = prev_sp_map(2);
+		s.position.x = prev_sp_map(0); 
+		s.position.y = prev_sp_map(1);
+		s.position.z = prev_sp_map(2);
+
+		point_in.point.x = _position(0);
+		point_in.point.y = _position(1);
+		point_in.point.z = _position(2); 
+
+		try {
+			tf2::doTransform(point_in, point_out, _tf_odom_to_map);
+			position(0) = point_out.point.x;
+			position(1) = point_out.point.y;
+			position(2) = point_out.point.z;
+
+		} catch (const tf2::TransformException &ex) {
+			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+			return false; // If transform fails, we cannot proceed
+		} 
+		
+	}else {
+		s.position.x = _prev_sp(0); 
+		s.position.y = _prev_sp(1);
+		s.position.z = _prev_sp(2);
+		position = _position;
+	}
+
     s.orientation.w = 1.0; // _last_att_sp(0); 
     s.orientation.x = 0.0; // _last_att_sp(1);
     s.orientation.y = 0.0; // _last_att_sp(2);
@@ -1225,8 +1255,9 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
     double bz_min = 0.0; //( _w_p[2] < wp[2] ) ?   
     double bz_max = 0.0; 
 
+	// Create bounds on the basis of actual position
 	Eigen::Vector3f _w_p;
-	_w_p << _position(0), _position(1), _position(2);
+	_w_p << position(0), position(1), position(2);
 
     if (  _w_p[2] < wp[2]  ) {
         bz_min = _w_p[2];
@@ -1328,12 +1359,39 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 
 	while( valid_path && !_stop_trajectory && *wp < poses.size() && !_wp_traj_completed && !_replan){	 // continue checking while executing
 
+		RCLCPP_INFO_ONCE(get_logger(), "Checking path");
 		if(*wp != 0){
-			
-			pt_i << _position(0), _position(1), _position(2); 
+			RCLCPP_INFO(get_logger(), "wp not empty");
 
+			if(_do_transform){
+				matrix::Vector3f position;
+				geometry_msgs::msg::PointStamped point_in, point_out;
+				point_in.header.stamp = this->get_clock()->now();
+				point_in.header.frame_id = _child_transf;
+				point_in.point.x = _position(0);
+				point_in.point.y = _position(1);
+				point_in.point.z = _position(2); 
+
+				try {
+					tf2::doTransform(point_in, point_out, _tf_odom_to_map);
+					position(0) = point_out.point.x;
+					position(1) = point_out.point.y;
+					position(2) = point_out.point.z;
+					
+				} catch (const tf2::TransformException &ex) {
+					RCLCPP_WARN(get_logger(), "Transform failed: %s", ex.what());
+					break; // If transform fails, we cannot proceed
+				} 
+				pt_i << position(0), position(1), position(2);  // use position in map frame
+				
+			}else {
+				
+				pt_i << _position(0), _position(1), _position(2); 
+			}
+			
+			
 			for(int i=*wp ; i<poses.size(); i++ ) {
-				//RCLCPP_WARN(get_logger(), "Checking wp %f", i);
+				RCLCPP_INFO(get_logger(), "Checking wp %f", i);
 				pt_f << poses[i].position.x, poses[i].position.y, poses[i].position.z;
 				
 				dir = (pt_f - pt_i);
@@ -1368,7 +1426,7 @@ void OffboardControl::check_path(const std::vector<POSE> & poses, const std::sha
 		
 		if( _wp_traj_completed ){
 
-			RCLCPP_WARN(get_logger(), "Checking path ENDED - Trajectory completed");
+			RCLCPP_INFO(get_logger(), "Checking path ENDED - Trajectory completed");
 		}
 	}
 	if( !valid_path ) {

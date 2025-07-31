@@ -34,6 +34,9 @@ public:
     {
         RCLCPP_INFO(this->get_logger(), "Move Manager node started, ready to send signals");
 
+        this->declare_parameter<double>("takeoff_altitude", 1.5);
+        _takeoff_altitude = this->get_parameter("takeoff_altitude").as_double();
+
         // Configure QoS per ros2
         rclcpp::QoS qos(rclcpp::KeepLast(1));
         rmw_qos_profile_t cmd_qos_profile = rmw_qos_profile_sensor_data;
@@ -314,11 +317,13 @@ public:
             if (_current_command != _received_command)
             {
                 cv = instance2vector(_received_command);
-                if (_plan_status == "RUNNING")
+                // If a new command is received first stop
+                if(_plan_status == "RUNNING" || cv[0] == "stop")
                 {
                     cmd_to_send = "stop";
                     send_move_cmd(cmd_to_send, sp);
                 }
+
                 while (_plan_status != "STOPPED" && _plan_status != "IDLE" && _plan_status != "FAILED")
                 {
                     usleep(100000);
@@ -365,7 +370,7 @@ public:
                     send_move_cmd(cmd_to_send, sp);
                     cmd_to_send = "takeoff";
                     _current_command = _received_command;
-                    sp.position.z = 1.5;
+                    sp.position.z = _takeoff_altitude;
                     send_move_cmd(cmd_to_send, sp);
                     RCLCPP_INFO(this->get_logger(), "TAKEOFF command sent");
                 }
@@ -461,6 +466,7 @@ private:
     std::string _current_command = "";
     std::string _plan_status = "";
   
+    double _takeoff_altitude;
 
     // Mutex per proteggere l'ultimo messaggio di odometria
     boost::mutex _odom_mutex;
