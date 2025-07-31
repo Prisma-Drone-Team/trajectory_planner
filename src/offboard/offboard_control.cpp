@@ -587,6 +587,11 @@ void OffboardControl::move_cmd(){
 										RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 									}
 								}
+								else{
+									sp_odom(0) = sp(0);
+									sp_odom(1) = sp(1);
+									sp_odom(2) = sp(2);
+								}
 								
 								
 								compute_time_and_heading(sp_odom, yaw_d, yaw_time, duration);
@@ -621,28 +626,76 @@ void OffboardControl::move_cmd(){
 				sp(0) = _position(0);
 				sp(1) = _position(1);
 				sp(2) = current_sp(2);
+				if(_do_transform){
+					// Transform point from map frame to odom frame
+					geometry_msgs::msg::PointStamped point_in, point_out;
+					point_in.header.stamp = this->get_clock()->now();
+					point_in.header.frame_id = _parent_transf;
+					point_in.point.x = sp(0);
+					point_in.point.y = sp(1);
+					point_in.point.z = sp(2);
+					try {
+						tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+						sp_odom(0) = point_out.point.x;
+						sp_odom(1) = point_out.point.y;
+						sp_odom(2) = point_out.point.z;
+					} 
+					catch (const tf2::TransformException &ex) {
+						RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+					}
+				}
+				else{
+					sp_odom(0) = sp(0);
+					sp_odom(1) = sp(1);
+					sp_odom(2) = sp(2);
+				}
 			
 				yaw_d = matrix::Eulerf(_attitude).psi(); 
 				yaw_d = _prev_yaw_sp; 
-				duration = 1.0 + std::abs(sp(2))/(_max_velocity);
+				duration = 1.0 + std::abs(sp_odom(2))/(_max_velocity);
 				this->flight_termination(0);
 				this->arm();
 
 				_replan = false;
 				_stop_trajectory = false;
 				 
-				start_traj(sp, yaw_d, duration);		
+				start_traj(sp_odom, yaw_d, duration);		
 
 			}
 			else if(cmd == "land") {
 				RCLCPP_INFO(this->get_logger(),"LAND command received");
 				sp(0) = _position(0);
 				sp(1) = _position(1);
-				sp(2) = -0.5; 
+				sp(2) = -0.5;
+				
+				if(_do_transform){
+					// Transform point from map frame to odom frame
+					geometry_msgs::msg::PointStamped point_in, point_out;
+					point_in.header.stamp = this->get_clock()->now();
+					point_in.header.frame_id = _parent_transf;
+					point_in.point.x = sp(0);
+					point_in.point.y = sp(1);
+					point_in.point.z = sp(2);
+					try {
+						tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+						sp_odom(0) = point_out.point.x;
+						sp_odom(1) = point_out.point.y;
+						sp_odom(2) = point_out.point.z;
+					} 
+					catch (const tf2::TransformException &ex) {
+						RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+					}
+				}
+				else{
+					sp_odom(0) = sp(0);
+					sp_odom(1) = sp(1);
+					sp_odom(2) = sp(2);
+				}
+				 
 				current_sp = sp;
 				_replan = false;
 				_stop_trajectory = false; 
-				start_traj(sp, yaw_d, 15);	 // TODO tune time
+				start_traj(sp_odom, yaw_d, 15);	 // TODO tune time
 				
 			}
 			else if(cmd == "arm") {
@@ -798,9 +851,15 @@ void OffboardControl::key_input() {
 								sp_odom(0) = point_out.point.x;
 								sp_odom(1) = point_out.point.y;
 								sp_odom(2) = point_out.point.z;
-							} catch (const tf2::TransformException &ex) {
+							} 
+							catch (const tf2::TransformException &ex) {
 								RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 							}
+						}
+						else{
+							sp_odom(0) = sp(0);
+							sp_odom(1) = sp(1);
+							sp_odom(2) = sp(2);
 						}
 						compute_time_and_heading(sp_odom, yaw_d, yaw_time, duration);
 						
@@ -831,6 +890,29 @@ void OffboardControl::key_input() {
 			sp = _position;
 			std::cout << "Enter takeoff altitude (ENU frame): "; 
 			std::cin >> sp(2);
+			if(_do_transform){
+				// Transform point from map frame to odom frame
+				geometry_msgs::msg::PointStamped point_in, point_out;
+				point_in.header.stamp = this->get_clock()->now();
+				point_in.header.frame_id = _parent_transf;
+				point_in.point.x = sp(0);
+				point_in.point.y = sp(1);
+				point_in.point.z = sp(2);
+				try {
+					tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+					sp_odom(0) = point_out.point.x;
+					sp_odom(1) = point_out.point.y;
+					sp_odom(2) = point_out.point.z;
+				} 
+				catch (const tf2::TransformException &ex) {
+					RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+				}
+			}
+			else{
+				sp_odom(0) = sp(0);
+				sp_odom(1) = sp(1);
+				sp_odom(2) = sp(2);
+			}
 			
 			yaw_d = matrix::Eulerf(_attitude).psi(); 
 			
@@ -841,16 +923,39 @@ void OffboardControl::key_input() {
 			this->arm();
 			_stop_trajectory = false; 
 		
-			start_traj(sp, yaw_d, duration);
+			start_traj(sp_odom, yaw_d, duration);
 		
 		}
 		else if(cmd == "land") {
 			std::cout << "Landing procedure triggered... \nRemember to kill disarm manually after landed.\n";
 			sp = _prev_sp;
 			sp(2) = -0.5; 
+			if(_do_transform){
+				// Transform point from map frame to odom frame
+				geometry_msgs::msg::PointStamped point_in, point_out;
+				point_in.header.stamp = this->get_clock()->now();
+				point_in.header.frame_id = _parent_transf;
+				point_in.point.x = sp(0);
+				point_in.point.y = sp(1);
+				point_in.point.z = sp(2);
+				try {
+					tf2::doTransform(point_in, point_out, _tf_map_to_odom);
+					sp_odom(0) = point_out.point.x;
+					sp_odom(1) = point_out.point.y;
+					sp_odom(2) = point_out.point.z;
+				} 
+				catch (const tf2::TransformException &ex) {
+					RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
+				}
+			}
+			else{
+				sp_odom(0) = sp(0);
+				sp_odom(1) = sp(1);
+				sp_odom(2) = sp(2);
+			}
 			_stop_trajectory = false; 
 			yaw_d = _prev_yaw_sp; 
-			start_traj(sp, yaw_d, 15);	 // TODO tune time
+			start_traj(sp_odom, yaw_d, 15);	 // TODO tune time
 		}
 		else if(cmd == "arm") {
 			RCLCPP_INFO(this->get_logger(),"Arm command received");
@@ -1178,7 +1283,7 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 	if(_do_transform){
 		geometry_msgs::msg::PointStamped point_in, point_out;
 		point_in.header.stamp = this->get_clock()->now();
-		point_in.header.frame_id = _parent_transf;
+		point_in.header.frame_id = _child_transf;
 		point_in.point.x = _prev_sp(0);
 		point_in.point.y = _prev_sp(1);
 		point_in.point.z = _prev_sp(2);
@@ -1187,13 +1292,21 @@ bool OffboardControl::plan(Eigen::Vector3d wp, std::shared_ptr<std::vector<POSE>
 			prev_sp_map(0) = point_out.point.x;
 			prev_sp_map(1) = point_out.point.y;
 			prev_sp_map(2) = point_out.point.z;
-		} catch (const tf2::TransformException &ex) {
+		} 
+		catch (const tf2::TransformException &ex) {
 			RCLCPP_WARN(this->get_logger(), "Transform failed: %s", ex.what());
 		} 
-		}
-    s.position.x = prev_sp_map(0); 
-    s.position.y = prev_sp_map(1);
-    s.position.z = prev_sp_map(2);
+	
+		s.position.x = prev_sp_map(0); 
+		s.position.y = prev_sp_map(1);
+		s.position.z = prev_sp_map(2);
+	}
+	else{ 
+		s.position.x = _prev_sp(0); 
+		s.position.y = _prev_sp(1);
+		s.position.z = _prev_sp(2);
+	}
+    
     s.orientation.w = 1.0; // _last_att_sp(0); 
     s.orientation.x = 0.0; // _last_att_sp(1);
     s.orientation.y = 0.0; // _last_att_sp(2);
