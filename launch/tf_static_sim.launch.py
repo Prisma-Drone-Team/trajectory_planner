@@ -11,27 +11,26 @@ def generate_launch_description():
 
 
     return LaunchDescription([
-        # OAk-D Lite
+        # Node(
+        #     package='tf2_ros', executable='static_transform_publisher', output='screen',
+        #     arguments=['0', '0', '0', '0.7071068', '0.7071068', '0.0', '0.0', 'odom', 'odomNED']),
+
+        # Node(
+        #     package='tf2_ros', executable='static_transform_publisher', output='screen',
+        #     arguments=['0', '0', ' 0', '0', '0', '3.14159265359', 'base_link_FRD', 'base_link']),  # ZYX
+        # # OAk-D Lite
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
         #     arguments=['0.15', '0.03', ' 0.202', '-1.5707','0', '-1.5707', 'base_link', 'x500_depth_0/OakD-Lite/base_link/StereoOV7251']),
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
         #     arguments=['0.15', '0.03', ' 0.202',  '-1.5707', '0', '-1.5707', 'base_link', 'x500_depth_0/OakD-Lite/base_link/IMX214']),
-
-
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
-        #     arguments=['0.15', '0.03', ' 0.202', '-1.5707','0', '-1.5707', 'base_link', 'x500_depth_0/base_footprint']),
-
-
+        #     arguments=['0.15', '0.03', ' 0.202', '-1.5707','0', '-1.5707', 'odom', 'odom/x500_depth_0/OakD-Lite/base_link/StereoOV7251']),
         # Node(
         #     package='tf2_ros', executable='static_transform_publisher', output='screen',
-        #     arguments=['0', '0', ' 0', '0', '0', '-3.14159265359', 'base_link', 'base_link_FRD']),  # ZYX
-        
-        # Node(
-        #     package='tf2_ros', executable='static_transform_publisher', output='screen',
-        #     arguments=['0', '0', ' 0', '0', '0', '3.14159265359', 'base_link_FRD', 'base_link']),  # ZYX
+        #     arguments=['0.15', '0.03', ' 0.202',  '-1.5707', '0', '-1.5707', 'odom', 'odom/x500_depth_0/OakD-Lite/base_link/IMX214']),
 
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',

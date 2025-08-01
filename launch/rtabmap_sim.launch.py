@@ -23,14 +23,16 @@ def generate_launch_description():
         'rgbd_camera_frame_id': 'x500_depth_0/OakD-Lite/base_link/IMX214', 
         'wait_for_transform': 10.5,
         'Mem/IncrementalMemory': 'true',  # Set to false for localization mode
-        'Mem/InitWMWithAllNodes': 'true',  # Don't wait for all nodes to initialize map
+        'Mem/InitWMWithAllNodes': 'true',  
         #'sync_queue_size': 10,  # Adjusted for simulation
         #'topic_queue_size': 10,  # Adjusted for simulation
         #'publish_tf': True,  # CRITICAL: Force rtabmap to publish tf
         'publish_tf_odom': False,  # Don't conflict with move_manager odometry
         #'publish_null_when_lost': True,  # Keep publishing tf even when lost
-        # 'Reg/Force3DoF': 'true',  # Force 2D SLAM for better initial mapping
-        #'RGBD/LoopClosureReextractFeatures': 'true',
+        # 'Reg/Force3DoF': 'true',  # Enable 2D SLAM for better initial mapping
+        # 'Grid/FromDepth': 'false',  # Use 2D occupancy grid
+        #'Mem/NotLinkedNodesKept': 'false',  # Don't keep unlinked nodes
+        'use_sim_time': True,
     }]
 
     remappings=[

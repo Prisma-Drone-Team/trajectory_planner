@@ -5,29 +5,57 @@ offboard_control:
     takeoff_altitude: 1.5
     takeoff_climibing_time: 10
     robot_radius: 0.4
-    x_lower_bound: -5.0 
-    y_lower_bound: -5.0
-    x_upper_bound: 21.5
-    y_upper_bound: 11.0
+    x_lower_bound: -1.0 
+    y_lower_bound: -3.0
+    x_upper_bound: 4.0
+    y_upper_bound: 3.0
     z_lower_bound: 1.2
     z_upper_bound: 2.0
 
-    x_valid_min: -10.0
-    x_valid_max: 19.5
-    y_valid_min: -10.0
-    y_valid_max: 9.5
+    x_valid_min: -1.0
+    x_valid_max: 4.0
+    y_valid_min: -3.0
+    y_valid_max: 3.0
 
     z_motion_threshold: 0.1
     dist_from_error: 0.3
     kp_vs: 0.2
 
-    use_octomap: 0.0 # BOOL
+    use_octomap: true
     cv: 0.5
     cv_to: 0.2
     cv_rot: 0.3
-    rviz_output: 0.0 # BOOL
+    rviz_output: true
     id_to_follow: 16
     marker_timeout: 0.1
 
-    max_yaw_rate: 0.5
-    max_velocity: 0.5
+    max_yaw_rate: 0.25
+    max_velocity: 0.25
+    use_key_input: false # BOOL
+
+    offboard_control_mode_topic: "fmu/in/offboard_control_mode"
+    vehicle_command_topic: "fmu/in/vehicle_command"
+    trajectory_setpoint_topic: "/px4/trajectory_setpoint_enu"
+    odom_topic: "/px4/odometry/out"
+    octomap_topic: "/octomap_binary"
+    move_cmd_topic: "move_cmd"
+    path_topic: "rrt/path"
+    check_path_topic: "/leo/drone/check_path"
+    plan_status_topic: "/leo/drone/plan_status"
+
+    parent_transform: "map"
+    child_transform: "odom"
+    do_transform: true
+    check_frame_id: "map" # Frame ID for the check marker
+    
+    # Teleop parameters
+    teleop_max_vel: 2.0         # Increased for better responsiveness
+    teleop_max_yaw_rate: 0.5    # Reduced for smoother yaw control
+    teleop_axis_linear_x: 1     # Left stick vertical (forward/backward)
+    teleop_axis_linear_y: 0     # Left stick horizontal (left/right)
+    teleop_axis_linear_z: 4     # Right stick vertical (up/down)
+    teleop_axis_angular_z: 3    # Right stick horizontal (yaw)
+    teleop_button_enable: 4     # LB button
+    teleop_button_arm: 0        # A button
+    teleop_button_takeoff: 3    # Y button
+    teleop_button_land: 1       # B button
