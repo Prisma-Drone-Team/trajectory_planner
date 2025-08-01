@@ -282,8 +282,8 @@ void OffboardControl::move_cmd(){
 			
 			RCLCPP_INFO(get_logger(), "Command accepted: %s. Pose: %f,%f,%f",_cmd.c_str(),_cmd_sp(0),_cmd_sp(1),_cmd_sp(2));
 			_new_command = false;
-			cmd = _cmd;
-			current_sp = _cmd_sp;
+			cmd = _cmd; // received from the last callback
+			current_sp = _cmd_sp; // received from the last callback
 			sp = current_sp;
 			_replan_cnt = 0;
 
