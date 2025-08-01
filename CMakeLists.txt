@@ -37,8 +37,9 @@ find_package(octomap REQUIRED)
 find_package(ompl REQUIRED)
 find_package(fcl REQUIRED)
 include_directories(include 
-  /opt/ros/humble/include/ompl-1.6
-  #/usr/include/3dPathPlanner
+  # /opt/ros/humble/include/ompl-1.6
+  /usr/local/include/ompl-1.6  #babyk source install
+  # /usr/include/3dPathPlanner
 )
 
 # Add frame_transforms lib
