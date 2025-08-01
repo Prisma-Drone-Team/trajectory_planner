@@ -1,4 +1,4 @@
-session_name: simulation
+session_name: flight
 socket_name: drone
 environment:
 pre_window: 
@@ -9,23 +9,36 @@ windows:
     - shell_command:
         - sleep 25
         - cd ~/dev_ws && source install/setup.bash
+        - ros2 launch drone_odometry2 slam_leonardo.launch.py
+    - shell_command:
+        - sleep 25
+        - cd ~/dev_ws && source install/setup.bash
         - ros2 run trajectory_planner offboard_control --ros-args --params-file /root/dev_ws/src/trajectory_planner/config/params.yaml
     - shell_command:
         - sleep 5
         - cd ~/dev_ws && source install/setup.bash
-        - ros2 run trajectory_planner move_manager_node --ros-args --params-file /root/dev_ws/src/trajectory_planner/config/params.yaml
+        - ros2 run trajectory_planner move_manager_node
     - shell_command:
         - sleep 20
         - cd ~/dev_ws && source install/setup.bash
         - ros2 topic echo /leo/drone/plan_status
     - shell_command:
         - cd ~/dev_ws && source install/setup.bash
+        #- ros2 run tf2_ros static_transform_publisher 1 0 1 0 0 0 map goal
     - shell_command:
         - sleep 25
         - cd ~/dev_ws && source install/setup.bash
-        #- ros2 run tf2_ros static_transform_publisher 1 0 1 0 0 0 map goal
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'takeoff'}" # to takeoff
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'go(10.0,5.0,3.0)'}" # to plan without RRT and FCL
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'flyto(goalX)'}" # X is a number 1-7
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'teleop'}" # to trigger teleoperation 
         #- ros2 topic pub /seed_pdt_drone/command std_msgs/msg/String "{data: 'land'}"  # to land
+    # OUTSIDE BABYK
+    # - shell_command:
+    #     - sleep 25
+    #     - cd ~/dev_ws && source install/setup.bash
+    #     - rviz2 -r /root/dev_ws/src/trajectory_planner/launch/rviz.launch.py
+    # - shell_command:
+    #     - sleep 25
+    #     - cd ~/dev_ws && source install/setup.bash
+    #     - ./qgroundcontrol-start.sh 
