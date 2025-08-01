@@ -51,16 +51,8 @@ offboard_control:
     check_frame_id: "map" # Frame ID for the check marker
 
     # Teleop parameters
-    teleop_max_vel: 2.0         # Increased for better responsiveness
+    teleop_max_vel: 1.0         # Increased for better responsiveness
     teleop_max_yaw_rate: 0.5    # Reduced for smoother yaw control
-    teleop_axis_linear_x: 1     # Left stick vertical (forward/backward)
-    teleop_axis_linear_y: 0     # Left stick horizontal (left/right)
-    teleop_axis_linear_z: 4     # Right stick vertical (up/down)
-    teleop_axis_angular_z: 3    # Right stick horizontal (yaw)
-    teleop_button_enable: 4     # LB button
-    teleop_button_arm: 0        # A button
-    teleop_button_takeoff: 3    # Y button
-    teleop_button_land: 1       # B button
 
 MoveManagerNode:
   ros__parameters:

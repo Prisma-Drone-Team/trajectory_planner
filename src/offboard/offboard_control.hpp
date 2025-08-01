@@ -235,14 +235,4 @@ private:
 	float _teleop_yawspeed{0.0f};
 	float _teleop_max_vel{1.0f};
 	float _teleop_max_yaw_rate{1.0f};
-	
-	// Joy axis mapping (default Xbox controller)
-	int _axis_linear_x{1};   // Left stick vertical
-	int _axis_linear_y{0};   // Left stick horizontal  
-	int _axis_linear_z{4};   // Right stick vertical
-	int _axis_angular_z{3};  // Right stick horizontal
-	int _button_enable{4};   // LB button
-	int _button_arm{0};      // A button
-	int _button_takeoff{3};  // Y button
-	int _button_land{1};     // B button
 };

@@ -248,38 +248,6 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_teleop_max_yaw_rate = this->get_parameter("teleop_max_yaw_rate").as_double();
 	RCLCPP_INFO(get_logger(), "teleop_max_yaw_rate: %f", _teleop_max_yaw_rate);
 
-	this->declare_parameter("teleop_axis_linear_x", 1);
-	_axis_linear_x = this->get_parameter("teleop_axis_linear_x").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_axis_linear_x: %d", _axis_linear_x);
-
-	this->declare_parameter("teleop_axis_linear_y", 0);
-	_axis_linear_y = this->get_parameter("teleop_axis_linear_y").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_axis_linear_y: %d", _axis_linear_y);
-
-	this->declare_parameter("teleop_axis_linear_z", 4);
-	_axis_linear_z = this->get_parameter("teleop_axis_linear_z").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_axis_linear_z: %d", _axis_linear_z);
-
-	this->declare_parameter("teleop_axis_angular_z", 3);
-	_axis_angular_z = this->get_parameter("teleop_axis_angular_z").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_axis_angular_z: %d", _axis_angular_z);
-
-	this->declare_parameter("teleop_button_enable", 4);
-	_button_enable = this->get_parameter("teleop_button_enable").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_button_enable: %d", _button_enable);
-
-	this->declare_parameter("teleop_button_arm", 0);
-	_button_arm = this->get_parameter("teleop_button_arm").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_button_arm: %d", _button_arm);
-
-	this->declare_parameter("teleop_button_takeoff", 3);
-	_button_takeoff = this->get_parameter("teleop_button_takeoff").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_button_takeoff: %d", _button_takeoff);
-
-	this->declare_parameter("teleop_button_land", 1);
-	_button_land = this->get_parameter("teleop_button_land").as_int();
-	RCLCPP_INFO(get_logger(), "teleop_button_land: %d", _button_land);
-
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
