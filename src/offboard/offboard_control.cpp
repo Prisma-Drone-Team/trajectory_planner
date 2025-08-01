@@ -4,7 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #define START_FROM_LAST_MEAS 0
-#define SIMULATION 0
+#define SIMULATION 1
 
 
 OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(STOPPED) {
