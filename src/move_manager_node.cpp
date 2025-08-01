@@ -53,8 +53,8 @@ public:
         _pdt_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         _pdt_tf_listener = std::make_shared<tf2_ros::TransformListener>(*_pdt_tf_buffer);
 
-        rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
-        auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+        // rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+        // auto qos_px4 = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
         if (SIMULATION)
         {
@@ -297,7 +297,12 @@ public:
 
     void pdt_callback(const std_msgs::msg::String::SharedPtr msg)
     {
-        _received_command = msg->data;
+        std::vector<std::string>  cv = instance2vector(msg->data);
+        bool command_is_valid = std::find(_valid_commands.begin(), _valid_commands.end(), cv[0]) != _valid_commands.end();
+        if(command_is_valid)
+            _received_command = msg->data;
+        else
+            RCLCPP_ERROR(this->get_logger(), "Invalid command received: %s", msg->data.c_str());
     }
 
     // Thread per read dei comandi PDT
@@ -314,23 +319,26 @@ public:
         while (rclcpp::ok())
         {
             usleep(10000); // 0.01 sec
-            if (_current_command != _received_command)
+
+            if(_current_command != _received_command )
             {
-                cv = instance2vector(_received_command);
                 // If a new command is received, first stop and wait for the drone to stop
                 if(_plan_status == "RUNNING" )
-                {
+                {   
                     cmd_to_send = "stop";
                     send_move_cmd(cmd_to_send, sp);
                     RCLCPP_INFO(this->get_logger(), "STOP command sent");
                 }
 
-                while (_plan_status != "STOPPED" && _plan_status != "IDLE" && _plan_status != "FAILED")
+                // Wait for the drone to stop before sending a new command
+                while(_plan_status != "STOPPED" && _plan_status != "IDLE" && _plan_status != "FAILED")
                 {
                     usleep(100000);
                     RCLCPP_INFO_ONCE(this->get_logger(), "Waiting for STOPPED or IDLE status");
                 }
+
                 cv = instance2vector(_received_command);
+
                 RCLCPP_INFO(this->get_logger(), "New command %s", _received_command.c_str());
 
                 if (cv[0] == "flyto")
@@ -399,10 +407,7 @@ public:
                     send_move_cmd(cmd_to_send, sp);
                     RCLCPP_INFO(this->get_logger(), "TELEOP command sent (subject to joy availability check)");
                 }
-                else
-                {
-                    RCLCPP_ERROR(this->get_logger(), "Invalid command");
-                }
+
             }
             usleep(100000);
         }
@@ -480,6 +485,15 @@ private:
     // Mutex per proteggere l'ultimo messaggio di odometria
     boost::mutex _odom_mutex;
     px4_msgs::msg::VehicleOdometry::UniquePtr _last_odometry_msg;
+
+    const std::vector<std::string> _valid_commands = {
+        "flyto",
+        "go",
+        "takeoff",
+        "land",
+        "stop",
+        "teleop"
+    };
 };
 
 int main(int argc, char *argv[])
