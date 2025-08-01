@@ -51,7 +51,8 @@ offboard_control:
     check_frame_id: "map" # Frame ID for the check marker
 
     # Teleop parameters
-    teleop_max_vel: 1.0         # Increased for better responsiveness
+    trigger_teleop: 1.0 # BOOL
+    teleop_max_vel: 1.0         
     teleop_max_yaw_rate: 0.5    # Reduced for smoother yaw control
 
 MoveManagerNode:

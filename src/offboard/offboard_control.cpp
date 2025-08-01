@@ -248,6 +248,10 @@ OffboardControl::OffboardControl() : rclcpp::Node("offboard_control"), _state(ST
 	_teleop_max_yaw_rate = this->get_parameter("teleop_max_yaw_rate").as_double();
 	RCLCPP_INFO(get_logger(), "teleop_max_yaw_rate: %f", _teleop_max_yaw_rate);
 
+	this->declare_parameter("trigger_teleop", 1.0);
+	_trigger_teleop = this->get_parameter("trigger_teleop").as_double();
+	RCLCPP_INFO(get_logger(), "trigger_teleop: %f", _trigger_teleop);
+
     _pp = new PATH_PLANNER();
     _pp->init( _xbounds, _ybounds, _zbounds);
     _pp->set_robot_geometry(_robot_radius);
@@ -643,7 +647,7 @@ void OffboardControl::move_cmd(){
 				_status = "STOPPED";
 
 			}else if(cmd == "teleop") {
-				if (!_joy_available) {
+				if (!_joy_available && _trigger_teleop > 0.0f) {
 					RCLCPP_ERROR(this->get_logger(), "TELEOP command rejected - Joy node not available!");
 					RCLCPP_ERROR(this->get_logger(), "Please make sure joy_node is running and publishing to /joy topic");
 					continue;
@@ -851,7 +855,7 @@ void OffboardControl::key_input() {
 			_status = "STOPPED";
 
 		}else if(cmd == "teleop") {
-			if (!_joy_available) {
+			if (!_joy_available && _trigger_teleop > 0.0f) {
 				RCLCPP_ERROR(this->get_logger(), "TELEOP command rejected - Joy node not available!");
 				RCLCPP_ERROR(this->get_logger(), "Please make sure joy_node is running and publishing to /joy topic");
 				continue;

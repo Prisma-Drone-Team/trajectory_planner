@@ -192,7 +192,7 @@ private:
 
 	matrix::Matrix3f _T_enu_to_ned;
 	bool _map_set;
-	double _use_octomap, _rviz_output, _dist_from_th_error;
+	double _use_octomap, _rviz_output, _dist_from_th_error, _trigger_teleop;
 	int _replan_cnt;
 
 	bool _stop_trajectory{false}, _plan_is_valid{true}, _wp_traj_completed{false};
