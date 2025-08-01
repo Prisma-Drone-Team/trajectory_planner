@@ -78,14 +78,14 @@ tmuxp load path/to/folder/simulation.yml
 Launch the complete simulation environment in separate terminals:
 ```bash
 # Start simulation
-cd ~/PX4-Autopilot
-make px4_sitl gz_x500_depth
+cd ~/PX4_neabotics_
+make px4_sitl gz_baby_k
 
 # Start MicroXRCE Agent
 MicroXRCEAgent udp4 -p 8888
 
 # Start ROS2 bridge
-ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image /model/x500_depth_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry
+ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image /model/baby_k_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry
 
 # Start RTABMap SLAM
 ros2 launch trajectory_planner rtabmap_sim.launch.py

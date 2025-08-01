@@ -8,15 +8,17 @@ windows:
   layout: tiled
   panes:
     - shell_command:            
-        - cd ~/PX4-Autopilot
-        - make px4_sitl gz_x500_depth
+        # - cd ~/PX4-Autopilot
+        # - make px4_sitl gz_x500_depth
+        - cd ~/PX4_neabotics
+        - make px4_sitl gz_baby_k
     - shell_command:
         - sleep 1          
         - MicroXRCEAgent udp4 -p 8888
     - shell_command:
         - sleep 2           
         - ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /camera@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image 
-          /model/x500_depth_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry  /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
+          /model/baby_k_0/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry  /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
     - shell_command:
         - sleep 5  
         - cd ~/ros2_ws && source install/setup.bash

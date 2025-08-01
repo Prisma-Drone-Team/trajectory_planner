@@ -63,7 +63,7 @@ public:
 
             auto qos_odom = rclcpp::QoS(rclcpp::KeepLast(10)).reliability(rclcpp::ReliabilityPolicy::BestEffort);
 
-            _odometry_sub = this->create_subscription<nav_msgs::msg::Odometry>("/model/x500_depth_0/odometry", qos_odom,
+            _odometry_sub = this->create_subscription<nav_msgs::msg::Odometry>("/model/baby_k_0/odometry", qos_odom,
                 [this](const nav_msgs::msg::Odometry::UniquePtr msg) {
 
                     //this->staticTfPub(); // CHECK IF NEEDED
@@ -166,7 +166,7 @@ public:
         geometry_msgs::msg::TransformStamped t;
         t.header.stamp = this->get_clock()->now();
         t.header.frame_id = "base_link";
-        t.child_frame_id = "x500_depth_0/OakD-Lite/base_link/IMX214";
+        t.child_frame_id = "baby_k_0/OakD-Lite/base_link/IMX214";
 
         t.transform.translation.x = 0.15;
         t.transform.translation.y = 0.03;
